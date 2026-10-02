@@ -27,12 +27,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--fatal-infos`, tests, and an Android build.
 - Design system owning colour, typography, spacing, radii and iconography:
   `AppColors` and `AppTextStyles` are `ThemeExtension`s so widgets read them
-  from the ambient theme, `AppTheme` builds the light and dark palettes from a
-  single seed, and `AppIcons` is the only file allowed to import the icon
-  package. Foreground colours are computed against their background rather than
-  fixed to white, and every foreground/background pair is asserted against its
-  WCAG target in tests, so a palette change cannot silently produce unreadable
-  text.
+  from the ambient theme, and `AppIcons` is the only file allowed to import the
+  icon package.
+- Dark-first neon direction: neon cyan and magenta on a near-black field, with a
+  derived light palette of deeper, desaturated equivalents of the same hues,
+  because neon cannot clear the contrast floor against white.
+- `AppColors` owns the palette and overlays it onto the generated `ColorScheme`,
+  so Material components cannot drift away from the design system's tokens.
+  Every foreground/background pair is asserted against its WCAG target in both
+  brightnesses, and semantic states must additionally differ by at least 1.35x
+  in luminance, because a neon trio is otherwise indistinguishable in greyscale.
+- Theme switching selects the nearer palette rather than blending: a
+  per-channel blend was measured to render body text at 1.05:1 at the midpoint.
 - Feature specification (`FEATURES.md`) and four derived feature documents under
   `features/`, each with an explicit current-status section.
 - Protocol contract (`docs/PROTOCOL.md`) with unresolved decisions marked

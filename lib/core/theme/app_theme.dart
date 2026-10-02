@@ -4,72 +4,70 @@ import 'app_colors.dart';
 import 'app_text_styles.dart';
 import 'tokens.dart';
 
-/// Builds the app's light and dark themes.
+/// Builds the app's themes.
 ///
-/// §46 requires the design system to centralise colour, typography, spacing,
-/// radii and elevation. Spacing and radii are constants in `tokens.dart`
-/// because they do not change with brightness; colour and typography are
-/// [ThemeExtension]s because both do, and a widget must be able to read them
-/// from the ambient theme rather than knowing which brightness is active.
+/// ## Dark first
+///
+/// The product is dark-first, so [dark] is the canonical theme and the one the
+/// app starts in. [light] is a derived, restrained counterpart for users whose
+/// system requires a light surface; see [AppColors] for why it is not simply
+/// the neon palette inverted.
+///
+/// Both are `final`, not getters. Building a theme runs `ColorScheme.fromSeed`
+/// and rebuilds the text scale, so a getter would repeat that work on every
+/// access, including incidental reads in tests and rebuilds.
 abstract final class AppTheme {
-  /// Seed for both palettes. See [AppColors.seed].
-  static Color get seed => AppColors.seed;
+  /// The brand palette. Dark is the design target.
+  static final ThemeData dark = _build(AppColors.neonDark, Brightness.dark);
 
-  /// Light theme.
+  /// Light counterpart. Not the primary design.
+  static final ThemeData light = _build(AppColors.neonLight, Brightness.light);
+
+  /// The mode the app boots with.
   ///
-  /// `final`, not a getter. Building a theme runs `ColorScheme.fromSeed` and
-  /// rebuilds the text scale, so a getter would repeat that work on every
-  /// access, including the incidental reads in tests and rebuilds. The theme is
-  /// immutable once built, so it is computed exactly once.
-  static final ThemeData light = _build(Brightness.light);
+  /// Dark, matching the design focus. Switching to [ThemeMode.system] is the
+  /// one-line change if the project later decides to follow the platform; the
+  /// light palette already passes the same contrast gates.
+  static const ThemeMode mode = ThemeMode.dark;
 
-  /// Dark theme. See [light] for why this is `final`.
-  static final ThemeData dark = _build(Brightness.dark);
-
-  static ThemeData _build(Brightness brightness) {
-    final ColorScheme scheme = ColorScheme.fromSeed(
-      seedColor: seed,
-      brightness: brightness,
+  static ThemeData _build(AppColors colors, Brightness brightness) {
+    // Material's tonal palette supplies the container and inverse pairs that
+    // AppColors does not name. The brand values are then overlaid so a
+    // component reading colorScheme agrees with one reading context.colors.
+    final ColorScheme scheme = colors.applyTo(
+      ColorScheme.fromSeed(seedColor: AppColors.seed, brightness: brightness),
     );
-    final ThemeData base = ThemeData(colorScheme: scheme);
 
-    final AppColors colors = brightness == Brightness.light
-        ? AppColors.light(scheme)
-        : AppColors.dark(scheme);
+    final ThemeData base = ThemeData(colorScheme: scheme);
+    final AppTextStyles styles = AppTextStyles.from(base.textTheme, scheme);
+    const BorderRadius buttonShape = BorderRadius.all(
+      Radius.circular(AppRadii.sm),
+    );
 
     return base.copyWith(
-      extensions: <ThemeExtension<dynamic>>[
-        colors,
-        AppTextStyles.from(base.textTheme, scheme),
-      ],
+      extensions: <ThemeExtension<dynamic>>[colors, styles],
       scaffoldBackgroundColor: colors.surface,
+      canvasColor: colors.surface,
       dividerTheme: DividerThemeData(color: colors.outline, space: 1),
-      // §50 requires text scaling to work. Material's default caps scaling on
-      // large display text, which stops a user who needs 200% text from
-      // getting it. Letting every style scale keeps the UI usable.
-      textTheme: _scaledTextTheme(base.textTheme, scheme),
+      textTheme: _scaledTextTheme(base.textTheme, styles),
       appBarTheme: AppBarTheme(
         backgroundColor: colors.surface,
         foregroundColor: colors.onSurface,
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
-        titleTextStyle: AppTextStyles.from(base.textTheme, scheme).titleLarge,
+        titleTextStyle: styles.titleLarge,
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size(64, AppSizes.minTouchTarget),
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(AppRadii.sm)),
-          ),
+          shape: const RoundedRectangleBorder(borderRadius: buttonShape),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(64, AppSizes.minTouchTarget),
           side: BorderSide(color: colors.outlineStrong),
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(AppRadii.sm)),
-          ),
+          shape: const RoundedRectangleBorder(borderRadius: buttonShape),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -87,9 +85,7 @@ abstract final class AppTheme {
       ),
       listTileTheme: const ListTileThemeData(
         minVerticalPadding: AppSpacing.sm,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(AppRadii.sm)),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: buttonShape),
       ),
       cardTheme: CardThemeData(
         color: colors.surfaceMuted,
@@ -103,34 +99,36 @@ abstract final class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: colors.onSurface,
-        contentTextStyle: AppTextStyles.from(
-          base.textTheme,
-          scheme,
-        ).bodyMedium.copyWith(color: colors.surface),
+        contentTextStyle: styles.bodyMedium.copyWith(color: colors.surface),
       ),
+      // Keyboard focus is the one place a neon design can go too far: a glow
+      // alone disappears for a user who cannot perceive the hue, and for anyone
+      // the focus indicator disappears. So the ring is a solid outline in
+      // outlineStrong, and the glow only reinforces it. §50, §84.
+      focusColor: colors.primary.withValues(alpha: 0.16),
+      hoverColor: colors.primary.withValues(alpha: 0.08),
+      splashFactory: InkSparkle.splashFactory,
     );
   }
 
-  /// Applies the same sizes as [AppTextStyles.from] to the ambient
-  /// [TextTheme], so Material components that read `textTheme` match the
-  /// project's own styles instead of drifting.
-  static TextTheme _scaledTextTheme(TextTheme base, ColorScheme scheme) {
-    final AppTextStyles styles = AppTextStyles.from(base, scheme);
-    return base.copyWith(
-      displayLarge: styles.displayLarge,
-      displayMedium: styles.displayLarge,
-      displaySmall: styles.displaySmall,
-      headlineLarge: styles.displaySmall,
-      headlineMedium: styles.titleLarge,
-      headlineSmall: styles.titleLarge,
-      titleLarge: styles.titleLarge,
-      titleMedium: styles.titleMedium,
-      titleSmall: styles.titleSmall,
-      bodyLarge: styles.bodyLarge,
-      bodyMedium: styles.bodyMedium,
-      bodySmall: styles.bodySmall,
-      labelLarge: styles.labelLarge,
-      labelMedium: styles.labelMedium,
-    );
-  }
+  /// Applies the same sizes as [AppTextStyles] to the ambient [TextTheme], so
+  /// Material components that read `textTheme` match the project's own styles
+  /// instead of drifting apart from them.
+  static TextTheme _scaledTextTheme(TextTheme base, AppTextStyles styles) =>
+      base.copyWith(
+        displayLarge: styles.displayLarge,
+        displayMedium: styles.displayLarge,
+        displaySmall: styles.displaySmall,
+        headlineLarge: styles.displaySmall,
+        headlineMedium: styles.titleLarge,
+        headlineSmall: styles.titleLarge,
+        titleLarge: styles.titleLarge,
+        titleMedium: styles.titleMedium,
+        titleSmall: styles.titleSmall,
+        bodyLarge: styles.bodyLarge,
+        bodyMedium: styles.bodyMedium,
+        bodySmall: styles.bodySmall,
+        labelLarge: styles.labelLarge,
+        labelMedium: styles.labelMedium,
+      );
 }

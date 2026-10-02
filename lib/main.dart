@@ -40,8 +40,11 @@ class PartilhaApp extends StatelessWidget {
     return MaterialApp(
       title: 'Partilha',
       debugShowCheckedModeBanner: false,
+      // Dark is the design target (AppTheme.mode); the light palette exists
+      // for users whose system requires it.
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
+      themeMode: AppTheme.mode,
       home: const PreImplementationNotice(),
     );
   }

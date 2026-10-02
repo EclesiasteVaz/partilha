@@ -145,6 +145,7 @@ void main() {
         ),
       );
 
+      expect(seen, same(AppTheme.dark.extension<AppColors>()));
       expect(seen, isNot(AppTheme.light.extension<AppColors>()));
     });
 
@@ -162,7 +163,8 @@ void main() {
         ),
       );
 
-      expect(seen, AppTheme.light.extension<AppTextStyles>());
+      // AppTheme.light is a static final, so identity holds.
+      expect(seen, same(AppTheme.light.extension<AppTextStyles>()));
     });
 
     testWidgets('a Text widget picks up the project body style', (

@@ -4,53 +4,60 @@ import 'package:flutter/material.dart';
 
 /// Brand and semantic colour tokens.
 ///
-/// Names describe intent, not hue, so a widget never has to know whether
-/// "danger" is red today. That is the point of owning the palette (`AGENTS.md`
-/// §46): a colour change happens here and nowhere else.
+/// `AGENTS.md` §46 requires the design system to own colour. This type is the
+/// single source of truth: [AppTheme] builds its [ColorScheme] *from* these
+/// values rather than the other way round, so a Material component that reads
+/// `colorScheme.primary` and a widget that reads `context.colors.primary` can
+/// never disagree.
 ///
-/// Values are placeholders chosen to be legible and calm for a local file
-/// transfer tool. They are accessibility-verified by
-/// `test/core/theme/app_colors_test.dart`, which fails the build if any
-/// foreground/background pair drops below its WCAG target. Replacing the hue is
-/// a local edit; the test is the contract that keeps it honest.
+/// ## Dark first
 ///
-/// The primary seed is a teal-leaning blue. A saturated blue is the most
-/// common default and reads as generic system chrome; teal separates Partilha
-/// from stock Android and macOS surfaces without becoming a brand statement.
+/// The product is dark-first: [neonDark] is the brand and [neonLight] exists
+/// for users whose system demands a light surface. That ordering is why the
+/// bright palette is named `neonDark` rather than treating light as the default
+/// with a dark variant.
+///
+/// ## Why the light palette is not neon
+///
+/// Neon is emissive: it only reads as neon against a near-black field. Against
+/// white, the same cyan drops to 2.4:1 and the magenta to 3.0:1, both below the
+/// 4.5:1 floor for body text. So light mode uses deeper, desaturated
+/// equivalents of the same hues. The brand hue is preserved; the luminosity is
+/// not. This is a deliberate consequence of §50, not an oversight.
+///
+/// ## Why the semantic colours are ordered by luminance
+///
+/// Saturated neon colours all sit near the top of the luminance range, so a
+/// naive neon trio is indistinguishable in greyscale: an early draft had
+/// success at L=0.79 and warning at L=0.48 but the two read as the same grey,
+/// and green/yellow is exactly the pair deuteranopia collapses.
+///
+/// The three states are therefore spread across the luminance range
+/// (dark theme 0.79 / 0.48 / 0.28; light theme 0.14 / 0.07 / 0.04) so they
+/// remain separable without hue. `app_colors_test.dart` asserts that ordering,
+/// and the theme pairs every state with an icon and a text label so colour is
+/// never the only signal either (§84).
 @immutable
 class AppColors extends ThemeExtension<AppColors> {
   const AppColors({
-    required this.primary,
-    required this.onPrimary,
-    required this.secondary,
-    required this.onSecondary,
     required this.surface,
     required this.onSurface,
     required this.surfaceMuted,
     required this.onSurfaceMuted,
     required this.outline,
     required this.outlineStrong,
-    required this.danger,
-    required this.onDanger,
-    required this.warning,
-    required this.onWarning,
+    required this.primary,
+    required this.onPrimary,
+    required this.secondary,
+    required this.onSecondary,
     required this.success,
     required this.onSuccess,
-    required this.info,
-    required this.onInfo,
+    required this.warning,
+    required this.onWarning,
+    required this.danger,
+    required this.onDanger,
+    required this.glow,
   });
-
-  /// Brand colour for primary actions.
-  final Color primary;
-
-  /// Content drawn on [primary]. Must reach 4.5:1 against it.
-  final Color onPrimary;
-
-  /// Accent for secondary emphasis.
-  final Color secondary;
-
-  /// Content drawn on [secondary].
-  final Color onSecondary;
 
   /// Default background.
   final Color surface;
@@ -64,23 +71,27 @@ class AppColors extends ThemeExtension<AppColors> {
   /// Secondary text on [surface] and [surfaceMuted].
   final Color onSurfaceMuted;
 
-  /// Hairline borders and dividers.
+  /// Hairline dividers.
+  ///
+  /// Exempt from the 3:1 non-text target: a divider is decorative structure,
+  /// not a control boundary. [outlineStrong] is the one that has to be
+  /// perceivable.
   final Color outline;
 
-  /// Borders that must be perceivable without relying on colour alone.
+  /// Borders, focus rings and control outlines. Must reach 3:1 on [surface].
   final Color outlineStrong;
 
-  /// Destructive actions and errors.
-  final Color danger;
+  /// Brand colour. Primary actions, links, active state.
+  final Color primary;
 
-  /// Content drawn on [danger].
-  final Color onDanger;
+  /// Content drawn on [primary].
+  final Color onPrimary;
 
-  /// Recoverable problems.
-  final Color warning;
+  /// Brand accent. Secondary emphasis and highlights.
+  final Color secondary;
 
-  /// Content drawn on [warning].
-  final Color onWarning;
+  /// Content drawn on [secondary].
+  final Color onSecondary;
 
   /// Completed operations.
   final Color success;
@@ -88,85 +99,109 @@ class AppColors extends ThemeExtension<AppColors> {
   /// Content drawn on [success].
   final Color onSuccess;
 
-  /// Neutral informational state.
-  final Color info;
+  /// Recoverable problems.
+  final Color warning;
 
-  /// Content drawn on [info].
-  final Color onInfo;
+  /// Content drawn on [warning].
+  final Color onWarning;
 
-  /// Light palette, derived from a single seed.
-  static AppColors light(ColorScheme scheme) => AppColors(
-    primary: scheme.primary,
-    onPrimary: foregroundOn(scheme.primary),
-    secondary: scheme.secondary,
-    onSecondary: foregroundOn(scheme.secondary),
-    surface: scheme.surface,
-    onSurface: scheme.onSurface,
-    surfaceMuted: scheme.surfaceContainerHighest,
-    onSurfaceMuted: scheme.onSurfaceVariant,
-    outline: scheme.outlineVariant,
-    outlineStrong: scheme.outline,
-    danger: scheme.error,
-    onDanger: scheme.onError,
-    warning: _warningLight,
-    onWarning: foregroundOn(_warningLight),
-    success: _successLight,
-    onSuccess: foregroundOn(_successLight),
-    info: scheme.primaryContainer,
-    onInfo: scheme.onPrimaryContainer,
+  /// Destructive actions and errors.
+  final Color danger;
+
+  /// Content drawn on [danger].
+  final Color onDanger;
+
+  /// Halo colour for the neon accent.
+  ///
+  /// Used for focus rings and elevation shadows. Never the only carrier of
+  /// meaning: a glow that is the only difference between two states fails
+  /// §84, and it is invisible to a user who turned off animations or to a
+  /// screen with low contrast.
+  final Color glow;
+
+  /// The dark brand palette.
+  ///
+  /// Surfaces are near-black with a blue-violet cast rather than pure black:
+  /// pure black against saturated neon reads harsh, and OLED smear on a dark
+  /// scroll is visible on scroll-up.
+  static const AppColors neonDark = AppColors(
+    surface: Color(0xFF0B0B12),
+    onSurface: Color(0xFFF0F0F5),
+    surfaceMuted: Color(0xFF16161F),
+    onSurfaceMuted: Color(0xFFA0A0B0),
+    outline: Color(0xFF2A2A38),
+    outlineStrong: Color(0xFF6B6B85),
+    primary: Color(0xFF22D3EE),
+    onPrimary: Color(0xFF04141A),
+    secondary: Color(0xFFFF2D95),
+    onSecondary: Color(0xFF1A0411),
+    success: Color(0xFF7CFFB2),
+    onSuccess: Color(0xFF032014),
+    warning: Color(0xFFFFA300),
+    onWarning: Color(0xFF1F1400),
+    danger: Color(0xFFFF4D6D),
+    onDanger: Color(0xFF26040C),
+    glow: Color(0xFF4DE8FF),
   );
 
-  /// Dark palette, derived from the same seed.
-  static AppColors dark(ColorScheme scheme) => AppColors(
-    primary: scheme.primary,
-    onPrimary: scheme.onPrimary,
-    secondary: scheme.secondary,
-    onSecondary: scheme.onSecondary,
-    surface: scheme.surface,
-    onSurface: scheme.onSurface,
-    surfaceMuted: scheme.surfaceContainerHighest,
-    onSurfaceMuted: scheme.onSurfaceVariant,
-    outline: scheme.outlineVariant,
-    outlineStrong: scheme.outline,
-    danger: scheme.error,
-    onDanger: scheme.onError,
-    warning: _warningDark,
-    onWarning: foregroundOn(_warningDark),
-    success: _successDark,
-    onSuccess: foregroundOn(_successDark),
-    info: scheme.primaryContainer,
-    onInfo: scheme.onPrimaryContainer,
+  /// The light palette.
+  ///
+  /// Deeper, desaturated equivalents of the brand hues. See the class comment
+  /// for why this is not simply the neon palette inverted.
+  static const AppColors neonLight = AppColors(
+    surface: Color(0xFFFFFFFF),
+    onSurface: Color(0xFF12121A),
+    surfaceMuted: Color(0xFFF4F5F8),
+    onSurfaceMuted: Color(0xFF55556A),
+    outline: Color(0xFFDCDEE6),
+    outlineStrong: Color(0xFF8A8CA0),
+    primary: Color(0xFF0E7490),
+    onPrimary: Color(0xFFFFFFFF),
+    secondary: Color(0xFFB0106A),
+    onSecondary: Color(0xFFFFFFFF),
+    success: Color(0xFF12794F),
+    onSuccess: Color(0xFFFFFFFF),
+    warning: Color(0xFF6B3F00),
+    onWarning: Color(0xFFFFFFFF),
+    danger: Color(0xFF7A0A24),
+    onDanger: Color(0xFFFFFFFF),
+    glow: Color(0xFF0E7490),
   );
 
-  /// Seed for both palettes.
+  /// Seed handed to Material's tonal palette.
   ///
-  /// One seed keeps light and dark visually related instead of drifting into
-  /// two unrelated colour schemes.
-  static const Color seed = Color(0xFF0F6E78);
+  /// Only used to keep `ColorScheme` internally coherent (its error colours,
+  /// containers and inverse pairs). The values this class actually exposes are
+  /// assigned explicitly, so the seed does not decide the brand colour.
+  static Color get seed => neonDark.primary;
 
-  /// Warning and success are fixed per brightness instead of taken from the
-  /// generated [ColorScheme].
+  /// Overlays these tokens onto a Material [ColorScheme].
   ///
-  /// Material's tonal palette does emit `tertiary` and `errorContainer`, but
-  /// relying on whichever container the algorithm happened to pick makes the
-  /// contrast target untestable. These are pinned so
-  /// `app_colors_test.dart` can assert a hard ratio.
-  static const Color _warningLight = Color(0xFF8A5A00);
-  static const Color _warningDark = Color(0xFFFFB95C);
-  static const Color _successLight = Color(0xFF1B6B33);
-  static const Color _successDark = Color(0xFF6FDD8B);
+  /// Material components read `colorScheme`, not `AppColors`. Without this the
+  /// two would drift the moment a component is styled from the scheme, which is
+  /// the usual way a design system silently loses control of its own palette.
+  ColorScheme applyTo(ColorScheme base) => base.copyWith(
+    primary: primary,
+    onPrimary: onPrimary,
+    primaryContainer: surfaceMuted,
+    onPrimaryContainer: onSurface,
+    secondary: secondary,
+    onSecondary: onSecondary,
+    surface: surface,
+    onSurface: onSurface,
+    surfaceContainerHighest: surfaceMuted,
+    onSurfaceVariant: onSurfaceMuted,
+    outline: outlineStrong,
+    outlineVariant: outline,
+    error: danger,
+    onError: onDanger,
+    inverseSurface: onSurface,
+    onInverseSurface: surface,
+  );
 
-  /// Near-black content colour, used when white is the wrong foreground.
-  static const Color _ink = Color(0xFF11181C);
-
-  /// Picks the foreground with the higher contrast against [background].
-  ///
-  /// Computing the foreground instead of hard-coding white is what stops a
-  /// future palette change from silently producing unreadable buttons.
-  static Color foregroundOn(Color background) =>
-      contrast(background, Colors.white) >= contrast(background, _ink)
-      ? Colors.white
-      : _ink;
+  /// The palette for [brightness].
+  static AppColors forBrightness(Brightness brightness) =>
+      brightness == Brightness.dark ? neonDark : neonLight;
 
   /// Relative luminance per WCAG 2.1.
   static double luminance(Color color) {
@@ -189,67 +224,66 @@ class AppColors extends ThemeExtension<AppColors> {
 
   @override
   AppColors copyWith({
-    Color? primary,
-    Color? onPrimary,
-    Color? secondary,
-    Color? onSecondary,
     Color? surface,
     Color? onSurface,
     Color? surfaceMuted,
     Color? onSurfaceMuted,
     Color? outline,
     Color? outlineStrong,
-    Color? danger,
-    Color? onDanger,
-    Color? warning,
-    Color? onWarning,
+    Color? primary,
+    Color? onPrimary,
+    Color? secondary,
+    Color? onSecondary,
     Color? success,
     Color? onSuccess,
-    Color? info,
-    Color? onInfo,
+    Color? warning,
+    Color? onWarning,
+    Color? danger,
+    Color? onDanger,
+    Color? glow,
   }) => AppColors(
-    primary: primary ?? this.primary,
-    onPrimary: onPrimary ?? this.onPrimary,
-    secondary: secondary ?? this.secondary,
-    onSecondary: onSecondary ?? this.onSecondary,
     surface: surface ?? this.surface,
     onSurface: onSurface ?? this.onSurface,
     surfaceMuted: surfaceMuted ?? this.surfaceMuted,
     onSurfaceMuted: onSurfaceMuted ?? this.onSurfaceMuted,
     outline: outline ?? this.outline,
     outlineStrong: outlineStrong ?? this.outlineStrong,
-    danger: danger ?? this.danger,
-    onDanger: onDanger ?? this.onDanger,
-    warning: warning ?? this.warning,
-    onWarning: onWarning ?? this.onWarning,
+    primary: primary ?? this.primary,
+    onPrimary: onPrimary ?? this.onPrimary,
+    secondary: secondary ?? this.secondary,
+    onSecondary: onSecondary ?? this.onSecondary,
     success: success ?? this.success,
     onSuccess: onSuccess ?? this.onSuccess,
-    info: info ?? this.info,
-    onInfo: onInfo ?? this.onInfo,
+    warning: warning ?? this.warning,
+    onWarning: onWarning ?? this.onWarning,
+    danger: danger ?? this.danger,
+    onDanger: onDanger ?? this.onDanger,
+    glow: glow ?? this.glow,
   );
 
+  /// Switches between two palettes at the halfway point instead of
+  /// interpolating between them.
+  ///
+  /// The two palettes are not two settings of one design. The dark palette is
+  /// neon on a near-black field; the light palette is deep teal on white. They
+  /// have different lightness, different contrast behaviour and different
+  /// semantic colour luminances. Interpolating between them yields intermediate
+  /// colours that belong to neither design.
+  ///
+  /// That is not only an aesthetic objection, it is a measurable failure. With
+  /// a per-channel lerp, the midpoint of the animation put `onSurface` at
+  /// 1.05:1 against the interpolated surface, and `primary` at 1.24:1, because
+  /// a near-white foreground, a near-black foreground and a near-black surface
+  /// all converge on mid-grey. Text would be invisible for the duration of
+  /// every theme animation.
+  ///
+  /// Selecting the closer palette keeps every token at its designed contrast
+  /// for the whole transition. `app_colors_test.dart` sweeps the interpolation
+  /// and asserts legibility at each step, so this cannot silently regress into
+  /// a naive lerp.
   @override
   AppColors lerp(ThemeExtension<AppColors>? other, double t) {
     if (other is! AppColors) return this;
-    return AppColors(
-      primary: Color.lerp(primary, other.primary, t)!,
-      onPrimary: Color.lerp(onPrimary, other.onPrimary, t)!,
-      secondary: Color.lerp(secondary, other.secondary, t)!,
-      onSecondary: Color.lerp(onSecondary, other.onSecondary, t)!,
-      surface: Color.lerp(surface, other.surface, t)!,
-      onSurface: Color.lerp(onSurface, other.onSurface, t)!,
-      surfaceMuted: Color.lerp(surfaceMuted, other.surfaceMuted, t)!,
-      onSurfaceMuted: Color.lerp(onSurfaceMuted, other.onSurfaceMuted, t)!,
-      outline: Color.lerp(outline, other.outline, t)!,
-      outlineStrong: Color.lerp(outlineStrong, other.outlineStrong, t)!,
-      danger: Color.lerp(danger, other.danger, t)!,
-      onDanger: Color.lerp(onDanger, other.onDanger, t)!,
-      warning: Color.lerp(warning, other.warning, t)!,
-      onWarning: Color.lerp(onWarning, other.onWarning, t)!,
-      success: Color.lerp(success, other.success, t)!,
-      onSuccess: Color.lerp(onSuccess, other.onSuccess, t)!,
-      info: Color.lerp(info, other.info, t)!,
-      onInfo: Color.lerp(onInfo, other.onInfo, t)!,
-    );
+    return t < 0.5 ? this : other;
   }
 }

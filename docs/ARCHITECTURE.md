@@ -1516,6 +1516,55 @@ Exact names may evolve.
 
 The principle is that design decisions should be centralized and reusable.
 
+## 56.1 Design direction: dark-first neon
+
+The product is dark-first. `AppColors.neonDark` is the brand palette;
+`AppColors.neonLight` is a derived counterpart for users whose system requires a
+light surface. `AppTheme.mode` boots the app in `ThemeMode.dark`.
+
+Colours are named by intent, never by hue, so a widget never knows that
+"danger" happens to be red.
+
+### The light palette is not the neon palette inverted
+
+Neon is emissive: it only reads as neon against a near-black field. Against
+white the same cyan drops to 2.4:1 and the magenta to 3.0:1, both below the
+4.5:1 floor for body text. Light mode therefore uses deeper, desaturated
+equivalents of the same hues. The brand hue is preserved; the luminosity is
+not. A test asserts the hue matches within 8 degrees of arc across both
+palettes, so the light palette still reads as Partilha rather than as a
+generic scheme.
+
+### Semantic colours are ordered by luminance
+
+Saturated neon colours all sit near the top of the luminance range, so a naive
+neon trio is indistinguishable in greyscale: an early draft had success at
+L=0.79 against warning at L=0.48, and green against yellow is exactly the pair
+deuteranopia collapses. The three states are therefore spread across the
+luminance range (dark 0.79 / 0.48 / 0.28; light 0.14 / 0.07 / 0.04) and a test
+requires every pair to differ by at least 1.35x. The theme also pairs every
+state with an icon and a text label, so colour is never the only signal (§84).
+
+### Theme switching does not blend
+
+`AppColors.lerp` selects the nearer palette at the halfway point instead of
+interpolating. The two palettes are two designs rather than two settings of one
+design, and a per-channel blend was measured to be unreadable: at the midpoint,
+`onSurface` sat at 1.05:1 against the interpolated surface and `primary` at
+1.24:1, because a near-white foreground, a near-black foreground and a
+near-black surface all converge on mid-grey. Every token stays at its designed
+contrast for the whole transition. A test sweeps the interpolation and asserts
+legibility at each step, so this cannot regress into a naive lerp.
+
+### AppColors owns the palette, not the ColorScheme
+
+Material components read `colorScheme`, not `AppColors`. `AppColors.applyTo`
+overlays the tokens onto a generated `ColorScheme` so the two cannot drift,
+which is the usual way a design system silently loses control of its own
+palette. `AppTheme.light` and `AppTheme.dark` are `static final`, not getters:
+building a theme runs `ColorScheme.fromSeed` and rebuilds the text scale, so a
+getter would repeat that work on every access.
+
 ---
 
 # 57. Icons

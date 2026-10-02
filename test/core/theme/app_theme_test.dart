@@ -243,12 +243,12 @@ void main() {
       expect(light.lerp(null, 0.5), same(light));
     });
 
-    test('lerp interpolates between the two palettes', () {
+    test('lerp switches rather than blending two distinct designs', () {
+      // See AppColors.lerp: a blend was measured at 1.05:1 for body text.
       final AppColors light = AppTheme.light.extension<AppColors>()!;
       final AppColors dark = AppTheme.dark.extension<AppColors>()!;
-      final AppColors mid = light.lerp(dark, 0.5);
-      expect(mid.surface, isNot(light.surface));
-      expect(mid.surface, isNot(dark.surface));
+      expect(light.lerp(dark, 0.4), same(light));
+      expect(light.lerp(dark, 0.6), same(dark));
     });
 
     test('copyWith overrides only what is passed', () {
