@@ -1,0 +1,69 @@
+name: CI
+
+# Quality gates required by AGENTS.md §71. The pipeline fails when any of them
+# fails; the gates are not weakened to make a change pass.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new push supersedes an in-flight run for the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Format, analyze, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          # Pinned to an exact version so a new Flutter release cannot turn a
+          # green main into a red one without a deliberate bump.
+          flutter-version: 3.44.6
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Formatting
+        # AGENTS.md §63. A file that needs reformatting fails the build rather
+        # than being reformatted in place.
+        run: dart format --set-exit-if-changed --output=none .
+
+      - name: Static analysis
+        # AGENTS.md §62. Unresolved warnings and errors are failures.
+        run: flutter analyze --fatal-infos --fatal-warnings
+
+      - name: Unit and widget tests
+        # AGENTS.md §60, §61.
+        run: flutter test --reporter expanded
+
+  build:
+    name: Build Android and macOS targets
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.6
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      # Android is the primary target and builds on Linux, so it is the only
+      # platform this job can honestly verify (§41, §64). The macOS target
+      # cannot be built here; claiming otherwise would be exactly the mistake
+      # the platform status table exists to prevent.
+      - name: Build Android debug APK
+        run: flutter build apk --debug

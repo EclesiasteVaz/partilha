@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Architecture specification: feature-first Clean Architecture, dependency
   direction, package isolation matrix, and abstraction matrix.
+- Core error model: sealed `Failure` hierarchy covering the categories named in
+  `AGENTS.md` §14, each carrying the original exception for diagnostics and a
+  separate user-safe message for display. `isRetryable` is resolved in one
+  exhaustive switch so a new failure category cannot ship without a retry
+  verdict.
+- Core `Result<T, E extends Failure>` with `Success`/`Err`, `fold`, `map`,
+  `mapError`, and `guard`/`guardAsync` for converting stray exceptions at the
+  data boundary.
+- Core structured logger with level filtering and secret redaction applied in
+  one place, including nested maps and maps inside lists.
+- Dependency injection container wrapping `get_it`, used only from the
+  composition root.
+- Continuous integration running formatting, static analysis with
+  `--fatal-infos`, tests, and an Android build.
 - Feature specification (`FEATURES.md`) and four derived feature documents under
   `features/`, each with an explicit current-status section.
 - Protocol contract (`docs/PROTOCOL.md`) with unresolved decisions marked
@@ -70,8 +84,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Known Limitations
 
-- **Nothing is implemented.** The repository contains the default Flutter
-  scaffold plus the complete architecture and feature specification.
+- **Nothing is implemented.** The repository contains the generated Flutter
+  scaffold, the complete architecture and feature specification, and the core
+  error, result and logging primitives. No feature screen or flow exists.
 - **No platform is supported.** Android and macOS are the approved targets but
   have no implementation yet. `ios/`, `linux/`, `windows/` and `web/` contain
   unmodified scaffold only; they are neither built nor tested. See
