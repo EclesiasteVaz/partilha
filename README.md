@@ -32,7 +32,7 @@ The project focuses on direct device-to-device transfers, local network discover
 - [Performance](#performance)
 - [Error Handling](#error-handling)
 - [Security](#security)
-- [Supported Platforms](#supported-platforms)
+- [Platform Support Status](#platform-support-status)
 - [Development](#development)
 - [Testing](#testing)
 - [Code Quality](#code-quality)
@@ -886,24 +886,59 @@ Security mechanisms should be introduced deliberately and documented rather than
 
 ---
 
-# Supported Platforms
+# Platform Support Status
 
-## Initial targets
+Partilha targets Android and macOS first. Other platforms are present in the
+repository as unmodified `flutter create` scaffolding so that contributors can
+start work without regenerating the project, **not** because the application
+works there.
 
-- Android
-- macOS
+| Platform | Folder | Status | Built / tested |
+|---|---|---|---|
+| Android | `android/` | **Primary target** — not implemented yet | No |
+| macOS | `macos/` | **Primary target** — not implemented yet | No |
+| iOS | `ios/` | Scaffold only | No |
+| Windows | `windows/` | Scaffold only | No |
+| Linux | `linux/` | Scaffold only | No |
+| Web | `web/` | Scaffold only | No |
 
-## Future targets
+Status vocabulary:
 
-The architecture is intended to remain compatible with:
+- **Primary target** — inside the approved scope (`AGENTS.md` §41). Work is
+  planned and expected, but nothing is implemented yet.
+- **Scaffold only** — the platform folder exists, its contents are untouched
+  `flutter create` output, and no feature, permission or platform service has
+  been written for it. These platforms are **not supported**: they are neither
+  built nor tested, and no behaviour is guaranteed.
 
-- iOS
-- Windows
-- Linux
+Architectural readiness is not platform support. No feature is implemented on
+any platform at this point, and no platform-specific behaviour has been
+validated on real hardware.
 
-Additional platforms may have different capabilities or platform-specific implementations.
+Additional platforms may have different capabilities or platform-specific
+implementations. Platform-specific behavior should be isolated behind
+appropriate services where necessary, so that adding a platform does not
+touch business logic.
 
-Platform-specific behavior should be isolated behind appropriate services where necessary.
+### Keeping this table honest
+
+The table is the single place where platform support is claimed. When a
+platform gains a working implementation, a build, or a real-device test, this
+table and `docs/ARCHITECTURE.md` §48 must be updated in the same change.
+
+Promoting a platform requires more than a folder existing:
+
+- the feature actually builds and runs on it;
+- the permissions it needs are declared and requested through
+  `PermissionService` (`AGENTS.md` §40);
+- platform-specific behavior is isolated in a project-owned service
+  (`AGENTS.md` §41, §49);
+- it is built and exercised in CI or documented as manually verified
+  (`AGENTS.md` §64);
+- its limitations are recorded in `features/<feature>/FEATURE.md`.
+
+Contributions targeting a scaffold-only platform are welcome. Such a change
+should update this table rather than assume it.
 
 ---
 

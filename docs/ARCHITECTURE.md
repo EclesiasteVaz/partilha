@@ -1293,6 +1293,46 @@ However:
 
 Do not claim a platform is supported until it is actually implemented and validated.
 
+## 48.1 Implementation status per platform
+
+The repository contains a `flutter create` folder for every platform Flutter
+supports. Their presence is not a support claim. This section is the technical
+counterpart of the table in `README.md`, and both must be updated together.
+
+| Platform | Folder | Status | Built / tested |
+|---|---|---|---|
+| Android | `android/` | Primary target, not implemented | No |
+| macOS | `macos/` | Primary target, not implemented | No |
+| iOS | `ios/` | Scaffold only | No |
+| Windows | `windows/` | Scaffold only | No |
+| Linux | `linux/` | Scaffold only | No |
+| Web | `web/` | Scaffold only | No |
+
+Definitions:
+
+```text
+Primary target  →  approved scope (§41); planned, may be claimed as a goal
+Scaffold only   →  folder exists, contents are untouched `flutter create`
+                   output, no feature or platform service was written
+Not supported   →  not built, not tested, no behaviour guaranteed
+```
+
+A scaffold-only platform is retained deliberately so that a contributor can
+begin platform work without regenerating the project or disturbing the
+primary targets. The decision is recorded in
+`docs/decisions/0005-estado-das-plataformas.md`.
+
+The trade-off is accepted deliberately: a platform folder is easy to mistake
+for a working platform. To keep that mistake detectable:
+
+- the status is written down in exactly two places, this section and the
+  README table, and no other document may imply support;
+- promoting a platform requires a real build, declared permissions through
+  `PermissionService`, isolated platform behaviour (§49), and a recorded
+  test run (§64);
+- limitations are recorded in `features/<feature>/FEATURE.md`, never inferred
+  from the existence of a folder.
+
 ---
 
 # 49. Platform Abstraction

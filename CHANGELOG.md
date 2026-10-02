@@ -39,6 +39,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   repository root so documentation stays out of the compiled app bundle.
 - **Feature naming**: the transfer feature folder is `file_transfer/`, consistent
   with snake_case naming.
+- **Platform support status**: replaced the generic "initial/future targets"
+  wording with an explicit per-platform status table in `README.md` and
+  `docs/ARCHITECTURE.md` §48.1. `ios/`, `linux/`, `windows/` and `web/` are
+  recorded as scaffold-only: untouched `flutter create` output, not built and
+  not tested. Platform folders are retained deliberately so platform
+  contributions can start without regenerating the project. See
+  `docs/decisions/0005-estado-das-plataformas.md`.
+- **Analysis options**: replaced the generated `analysis_options.yaml`, which
+  enabled `flutter_lints` with every additional rule commented out, with strict
+  language modes and 79 verified lint rules.
 
 ### Removed
 
@@ -62,6 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Nothing is implemented.** The repository contains the default Flutter
   scaffold plus the complete architecture and feature specification.
+- **No platform is supported.** Android and macOS are the approved targets but
+  have no implementation yet. `ios/`, `linux/`, `windows/` and `web/` contain
+  unmodified scaffold only; they are neither built nor tested. See
+  `docs/decisions/0005-estado-das-plataformas.md`.
 - Discovery is blocked pending an mDNS provider validation spike.
 - File transfer is blocked pending the wire-framing and transport-encryption
   decisions.

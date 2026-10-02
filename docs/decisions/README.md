@@ -20,6 +20,7 @@ Consequências         → custos, riscos, e trabalho que passa a existir
 | [0002](0002-mdns-provider.md) | Provider de descoberta mDNS | Aceito, spike pendente |
 | [0003](0003-token-fora-do-mdns.md) | O token nunca sai em metadados de descoberta | Aceito |
 | [0004](0004-sem-dio-no-mvp.md) | Sem HTTP client (Dio) no MVP | Aceito |
+| [0005](0005-estado-das-plataformas.md) | Manter o scaffolding das plataformas não-alvo e vigiar o estado | Aceito |
 
 ## Regra
 

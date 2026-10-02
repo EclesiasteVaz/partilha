@@ -1247,6 +1247,41 @@ macOS
 
 Do not claim support for platforms that have not actually been implemented and tested.
 
+## 41.1 Platform support status
+
+The repository contains a `flutter create` folder for every platform the SDK
+supports. A platform folder is **not** a support claim.
+
+Support status is recorded in exactly two places, which must be updated in the
+same change whenever platform status moves:
+
+```text
+README.md → Platform Support Status        (user-facing)
+docs/ARCHITECTURE.md §48.1                  (technical source of truth)
+```
+
+Status vocabulary:
+
+```text
+Primary target  →  approved scope; planned
+Scaffold only   →  folder exists, untouched `flutter create` output,
+                   nothing implemented for the platform
+Not supported   →  not built, not tested, no behaviour guaranteed
+```
+
+Currently `ios/`, `linux/`, `windows/` and `web/` are scaffold only. They are
+retained deliberately so platform contributions can start without regenerating
+the project. See `docs/decisions/0005-estado-das-plataformas.md`.
+
+The agent must not describe a scaffold-only platform as supported, planned for
+near-term delivery, or tested. When implementing or validating a platform, the
+agent must update both status locations in the same change, and must record the
+platform's limitations in the relevant `features/<feature>/FEATURE.md`.
+
+Promoting a platform requires a real build, permissions requested through
+`PermissionService`, isolated platform behaviour, and a recorded test run — not
+merely the existence of a folder.
+
 ---
 
 # 42. Dart IO
