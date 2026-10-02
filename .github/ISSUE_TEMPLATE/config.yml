@@ -1,0 +1,12 @@
+---
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/partilha/partilha/security/advisories/new
+    about: Report privately. Please do not open a public issue for a vulnerability.
+  - name: Question or usage help
+    url: https://github.com/partilha/partilha/discussions
+    about: Ask how to use Partilha, or clarify documentation.
+  - name: Architecture or proposal
+    url: https://github.com/partilha/partilha/discussions
+    about: Discuss a change that requires approval before implementation.
