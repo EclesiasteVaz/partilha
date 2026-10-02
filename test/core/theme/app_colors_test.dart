@@ -121,11 +121,15 @@ void main() {
         }
       });
 
-      test('the glow is visible but never the only state signal', () {
+      test('the glow clears the non-text ratio', () {
+        // A palette invariant, not a UI guarantee: no widget consumes glow yet,
+        // so this only guarantees that the token is usable as a visible
+        // accent by the first screen that needs one. It says nothing about a
+        // specific element.
         expect(
           AppColors.contrast(colors.glow, colors.surface),
           greaterThanOrEqualTo(_aaNonText),
-          reason: '$label glow must be visible where it is used',
+          reason: '$label glow must be visible against its own surface',
         );
       });
 

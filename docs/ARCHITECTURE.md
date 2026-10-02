@@ -1565,6 +1565,16 @@ palette. `AppTheme.light` and `AppTheme.dark` are `static final`, not getters:
 building a theme runs `ColorScheme.fromSeed` and rebuilds the text scale, so a
 getter would repeat that work on every access.
 
+### glow is a reserved token
+
+`AppColors.glow` is defined but not yet consumed by any widget, because the
+first real screen has not been built and there is no surface worth lighting. A
+test asserts only that the token clears the non-text ratio against its own
+surface, which is a property of the palette and not a promise about any
+specific element. When it is used, it must never be the sole carrier of meaning:
+neon hue is invisible to a user who cannot perceive it, so every state pairs the
+glow with an icon and a text label (§50, §84).
+
 ---
 
 # 57. Icons

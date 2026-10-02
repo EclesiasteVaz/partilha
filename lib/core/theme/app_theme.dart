@@ -101,10 +101,12 @@ abstract final class AppTheme {
         backgroundColor: colors.onSurface,
         contentTextStyle: styles.bodyMedium.copyWith(color: colors.surface),
       ),
-      // Keyboard focus is the one place a neon design can go too far: a glow
-      // alone disappears for a user who cannot perceive the hue, and for anyone
-      // the focus indicator disappears. So the ring is a solid outline in
-      // outlineStrong, and the glow only reinforces it. §50, §84.
+      // focusColor is the focus *overlay tint*, not a focus ring. The tint is
+      // kept low and derived from primary rather than from glow: a glow-only
+      // focus cue disappears for a user who cannot perceive the hue, which is
+      // exactly the failure a neon palette invites (§50, §84). `glow` stays
+      // unused until a real screen has a surface worth glowing; the focus
+      // indicator itself is Material's default solid outline.
       focusColor: colors.primary.withValues(alpha: 0.16),
       hoverColor: colors.primary.withValues(alpha: 0.08),
       splashFactory: InkSparkle.splashFactory,
