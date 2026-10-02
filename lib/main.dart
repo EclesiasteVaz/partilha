@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:partilha/core/di/di.dart';
 import 'package:partilha/core/logging/logging.dart';
+import 'package:partilha/core/theme/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,19 +28,21 @@ Future<void> main() async {
 
 /// Root widget.
 ///
-/// Deliberately minimal. The design system (AGENTS.md §46), typography (§48)
-/// and iconography (§47) are not implemented yet, and inventing a home screen
-/// before the design tokens exist would bake throwaway choices into the first
-/// real screen.
+/// Deliberately minimal. No home screen is invented: the first real screen
+/// belongs to a feature, and building one here would put product behaviour in
+/// the composition root. The design system (`AGENTS.md` §46) is wired up so
+/// feature screens inherit it.
 class PartilhaApp extends StatelessWidget {
   const PartilhaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       title: 'Partilha',
       debugShowCheckedModeBanner: false,
-      home: PreImplementationNotice(),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      home: const PreImplementationNotice(),
     );
   }
 }
@@ -57,26 +60,35 @@ class PreImplementationNotice extends StatelessWidget {
     return Scaffold(
       body: Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              const Text(
-                'Partilha',
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Under construction. No feature is implemented yet.',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Architecture and protocol are documented in docs/.',
-                style: Theme.of(context).textTheme.bodySmall,
-                textAlign: TextAlign.center,
-              ),
-            ],
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: AppSpacing.maxContentWidth,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                const AppIcon(AppIcons.info, size: AppIconSizes.xl),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'Partilha',
+                  style: context.textStyles.displaySmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Under construction. No feature is implemented yet.',
+                  style: context.textStyles.bodyLarge,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  'Architecture and protocol are documented in docs/.',
+                  style: context.textStyles.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   composition root.
 - Continuous integration running formatting, static analysis with
   `--fatal-infos`, tests, and an Android build.
+- Design system owning colour, typography, spacing, radii and iconography:
+  `AppColors` and `AppTextStyles` are `ThemeExtension`s so widgets read them
+  from the ambient theme, `AppTheme` builds the light and dark palettes from a
+  single seed, and `AppIcons` is the only file allowed to import the icon
+  package. Foreground colours are computed against their background rather than
+  fixed to white, and every foreground/background pair is asserted against its
+  WCAG target in tests, so a palette change cannot silently produce unreadable
+  text.
 - Feature specification (`FEATURES.md`) and four derived feature documents under
   `features/`, each with an explicit current-status section.
 - Protocol contract (`docs/PROTOCOL.md`) with unresolved decisions marked

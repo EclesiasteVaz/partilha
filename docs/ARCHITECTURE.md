@@ -1520,17 +1520,28 @@ The principle is that design decisions should be centralized and reusable.
 
 # 57. Icons
 
-HugeIcons is the icon source.
+HugeIcons is the icon source, pinned as `hugeicons`.
 
 UI code should use:
 
 ```text
 AppIcons
+AppIcon
 ```
 
 rather than importing HugeIcons directly.
 
 This protects the application from direct package coupling.
+
+`AppIcons` is the only file in the project allowed to import the package.
+`AppIcon` is the widget screens render, so the third-party widget is never
+constructed directly either.
+
+Icon names are verified against the pinned package version. A constant that does
+not exist is a compile error in `app_icons.dart`, and the tests additionally
+assert that no name resolves to the null glyph and that no two names share a
+code point, which catches a copy-paste mistake a reviewer would not spot in a
+list of constants.
 
 ---
 
@@ -1539,6 +1550,13 @@ This protects the application from direct package coupling.
 Typography belongs to the design system.
 
 Use project-defined styles instead of repeatedly creating arbitrary text styles.
+
+`AppTextStyles` declares explicit sizes rather than deriving them from
+`ThemeData.textTheme`. On the pinned Flutter version that theme resolves
+lazily and reports `null` for every `fontSize`, so a derived scale produces
+styles with no size and silently inherits whatever `DefaultTextStyle` provides.
+Sizes are therefore owned by the design system, which is also the only way they
+can be asserted in a test.
 
 The UI should maintain visual consistency across:
 
