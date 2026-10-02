@@ -10,5 +10,7 @@ PRODUCT_NAME = partilha
 // The application's bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = com.partilha.partilha
 
-// The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.partilha. All rights reserved.
+// The copyright displayed in application information.
+// Must stay consistent with LICENSE. MIT grants use and modification, so
+// "All rights reserved" would contradict the license the project ships under.
+PRODUCT_COPYRIGHT = Copyright © 2026 Partilha contributors
