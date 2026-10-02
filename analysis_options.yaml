@@ -1,0 +1,216 @@
+# Static analysis configuration for Partilha.
+#
+# Partilha requires strict linting (AGENTS.md §62). `flutter analyze` must pass
+# with no unresolved warnings or errors, and CI fails when it does not (§71).
+#
+# Disabling a lint to make CI pass is not acceptable (§62). When a suppression
+# is genuinely necessary, keep the scope minimal — prefer `// ignore:` on the
+# single offending line over a project-wide `false` — and explain it in review.
+#
+# Every rule name below is verified against Dart 3.12 / Flutter 3.44.
+
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    # No implicit downcast from `dynamic`. Prevents a `dynamic` map from
+    # silently yielding a wrong-typed value at a layer boundary (§8, §2.2).
+    strict-casts: true
+
+    # No implicit `dynamic` on untyped parameters, setters and initializers.
+    # Forces explicit types where a signature would otherwise absorb `dynamic`.
+    strict-inference: true
+
+    # Generic type arguments are never left raw.
+    strict-raw-types: true
+
+  errors:
+    # NOTE: measured on Flutter 3.44.6 / Dart 3.12.2, `unawaited_futures` does
+    # NOT fire for a discarded Future inside an `async` body, not even for the
+    # canonical `void main() async { doSomething(); }` case. The rule is kept
+    # enabled so it starts working if the analyzer is fixed, but it must not be
+    # treated as a safeguard today. `discarded_futures` (below) is the rule that
+    # demonstrably fires, and it covers the non-async caller case.
+    unawaited_futures: error
+
+    # A dangling `Future` or `Stream` subscription is a resource leak (§81).
+    # These govern correctness, so they are errors rather than warnings.
+    close_sinks: error
+    cancel_subscriptions: error
+
+  exclude:
+    # Build output and platform scaffolding we do not own.
+    - "build/**"
+    - "**/generated_plugin_registrant.dart"
+
+    # Generated sources must never be hand-edited (§9), so style lints we
+    # cannot act on are not useful there. They are still compiled and
+    # type-checked; this only relaxes style rules.
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+
+linter:
+  rules:
+    # ---------------------------------------------------------------------
+    # Exceptions and errors
+    # Infrastructure exceptions are converted at the data-layer boundary and
+    # must not leak through domain or presentation contracts (§15).
+    # ---------------------------------------------------------------------
+    avoid_catches_without_on_clauses: true
+    avoid_catching_errors: true
+    only_throw_errors: true
+    throw_in_finally: true
+    use_rethrow_when_possible: true
+
+    # `dynamic` defeats the purpose of typed domain contracts and of the
+    # Result/Failure model (§14).
+    avoid_dynamic_calls: true
+    avoid_annotating_with_dynamic: true
+    implicit_call_tearoffs: true
+
+    # ---------------------------------------------------------------------
+    # Async correctness and resource lifecycle (§80, §81)
+    # Every long-lived socket, subscription, file handle and timer must have a
+    # clear owner. These rules are the mechanical half of that requirement.
+    # ---------------------------------------------------------------------
+    await_only_futures: true
+    discarded_futures: true
+    avoid_slow_async_io: true
+    avoid_returning_null_for_void: true
+    avoid_void_async: true
+    unnecessary_await_in_return: true
+    join_return_with_assignment: true
+    avoid_positional_boolean_parameters: true
+    cancel_subscriptions: true
+    close_sinks: true
+
+    # ---------------------------------------------------------------------
+    # No silent failure (§83)
+    # ---------------------------------------------------------------------
+    empty_catches: true
+    empty_statements: true
+    unnecessary_statements: true
+    unrelated_type_equality_checks: true
+
+    # ---------------------------------------------------------------------
+    # Exhaustive state machines
+    # A transfer or pairing state that silently misses a case is a bug, so
+    # switch expressions over enums and sealed types must be total.
+    # ---------------------------------------------------------------------
+    exhaustive_cases: true
+    unreachable_from_main: true
+    valid_regexps: true
+    hash_and_equals: true
+    no_duplicate_case_values: true
+    test_types_in_equals: true
+
+    # ---------------------------------------------------------------------
+    # Memory safety and performance (§19, §21, §78, §79)
+    # Partilha transfers large files and must not make unnecessary copies.
+    # ---------------------------------------------------------------------
+    unnecessary_new: true
+    unnecessary_const: true
+    unnecessary_breaks: true
+    unnecessary_lambdas: true
+    unnecessary_getters_setters: true
+    unnecessary_overrides: true
+    unnecessary_null_aware_assignments: true
+    unnecessary_parenthesis: true
+    unnecessary_this: true
+    unnecessary_brace_in_string_interps: true
+    avoid_type_to_string: true
+    avoid_unnecessary_containers: true
+    prefer_const_constructors: true
+    prefer_const_constructors_in_immutables: true
+    prefer_const_declarations: true
+    prefer_const_literals_to_create_immutables: true
+
+    # `final` by default on locals. Note: incompatible with `unnecessary_final`,
+    # which pulls the other way; we deliberately prefer requiring `final`.
+    prefer_final_locals: true
+    prefer_final_in_for_each: true
+
+    # ---------------------------------------------------------------------
+    # Logging (§52)
+    # Production code uses the project logger; `print()` is not acceptable.
+    # ---------------------------------------------------------------------
+    avoid_print: true
+
+    # ---------------------------------------------------------------------
+    # Naming and API clarity (§56)
+    # ---------------------------------------------------------------------
+    always_declare_return_types: true
+    type_annotate_public_apis: true
+    camel_case_types: true
+    camel_case_extensions: true
+    constant_identifier_names: true
+    file_names: true
+    library_names: true
+    non_constant_identifier_names: true
+    no_leading_underscores_for_local_identifiers: true
+    no_leading_underscores_for_library_prefixes: true
+    prefer_single_quotes: true
+    require_trailing_commas: true
+    avoid_renaming_method_parameters: true
+
+    # ---------------------------------------------------------------------
+    # Imports and package boundaries (§5)
+    # ---------------------------------------------------------------------
+    directives_ordering: true
+    implementation_imports: true
+    depend_on_referenced_packages: true
+    sort_pub_dependencies: true
+
+    # ---------------------------------------------------------------------
+    # Collections
+    # ---------------------------------------------------------------------
+    prefer_is_empty: true
+    prefer_is_not_empty: true
+    prefer_iterable_whereType: true
+    collection_methods_unrelated_type: true
+    conditional_uri_does_not_exist: true
+
+    # ---------------------------------------------------------------------
+    # Flutter and UI (§46, §49, §50)
+    # ---------------------------------------------------------------------
+    use_build_context_synchronously: true
+    use_key_in_widget_constructors: true
+    use_super_parameters: true
+    sort_child_properties_last: true
+    sized_box_for_whitespace: true
+    sized_box_shrink_expand: true
+    use_full_hex_values_for_flutter_colors: true
+
+    # ---------------------------------------------------------------------
+    # Documentation (§57)
+    # ---------------------------------------------------------------------
+    dangling_library_doc_comments: true
+    slash_for_doc_comments: true
+    library_annotations: true
+    eol_at_end_of_file: true
+
+    # ---------------------------------------------------------------------
+    # Dart 3 style
+    # ---------------------------------------------------------------------
+    use_enums: true
+    use_named_constants: true
+    use_raw_strings: true
+    use_string_buffers: true
+    use_to_and_as_if_applicable: true
+    strict_top_level_inference: true
+    tighten_type_of_initializing_formals: true
+
+    # ---------------------------------------------------------------------
+    # Deliberately disabled, with reason
+    # ---------------------------------------------------------------------
+    # Enforced per-abstraction rather than project-wide. Enabling it globally
+    # produced noise without value; the AGENTS.md-level requirement for
+    # Dartdoc on public APIs is handled in review, not by the linter.
+    public_member_api_docs: false
+
+    # Superseded by `always_specify_types`, which is not part of the strict
+    # model we want here: inferred types are allowed where obvious.
+    always_specify_types: false
+
+    # Noises on the multi-line string blocks used by generated payload models.
+    leading_newlines_in_multiline_strings: false
