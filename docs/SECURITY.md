@@ -715,6 +715,39 @@ Consequences worth stating:
 - Pinning is enforced in the transport layer and must not be made optional by a
   caller.
 
+### Certificate generation: OPEN — APPROVAL REQUIRED
+
+The pinning model above requires the receiver to hold a **persistent,
+per-device** self-signed certificate whose fingerprint it publishes in the QR.
+How that certificate is created is **not** decided and is not solvable in pure
+Dart.
+
+Why this cannot simply be implemented:
+
+- `SecurityContext` can *use* a certificate but cannot create one.
+- The certificate must persist across app restarts, or every restart would
+  change the fingerprint and invalidate every existing pairing.
+- A shared or bundled key would make every Partilha installation present the
+  same certificate, which would collapse the pin into a public value and provide
+  no device identity at all.
+
+This is a platform concern, so per `AGENTS.md` §41 it belongs behind a
+project-owned service rather than being scattered across the transports:
+
+```text
+DeviceCertificateService
+    Future<Result<DeviceCertificate, Failure>> ensureCertificate()
+    Future<Result<CertificateFingerprint, Failure>> fingerprint()
+```
+
+with a platform implementation per platform, which must be approved before it is
+built. It is separate from `SecureCredentialStore`, which holds secrets such as
+the device token; a certificate with its private key is a credential, and the two
+need to agree on storage and protection.
+
+Until this is decided, the sender side of pinning is implemented and tested but
+there is no receiver to pair with.
+
 ### Fingerprint encoding: APPROVED
 
 **SHA-256 over the certificate's full DER encoding, lowercase hex.**

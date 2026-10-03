@@ -45,9 +45,16 @@ Two previously blocking decisions are now approved:
 - transport encryption: `wss://` with the certificate fingerprint pinned from
   the QR (`docs/SECURITY.md` §26.1).
 
-Still blocked on: maximum frame size, the integrity mechanism, the transfer
-identifier format, the handshake, the reconnection policy, the concurrency
-policy, and the retryability classification. See Open Questions.
+The transport foundation is now implemented in `core/network`: pinned `wss://`,
+the control/data frame split, the 64 KiB limit, and the serialized-transfer
+constraint. It depends on no open question, and is covered by integration tests
+against a real TLS WebSocket server, including a certificate that is refused when
+it does not match the pin.
+
+Still blocked on: the integrity mechanism, the transfer identifier format, the
+handshake, the reconnection policy, and the retryability classification. There is
+also no receiver to pair with yet, because per-device certificate generation is
+itself undecided (`docs/SECURITY.md` §26.1). See Open Questions.
 
 ## 4. User Problem
 

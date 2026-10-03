@@ -983,11 +983,35 @@ restarts from the beginning under the bounded retry policy.
 
 **Maximum frame size is 64 KiB, fixed. It is not negotiated.**
 
-A frame larger than 64 KiB is a protocol violation. The receiver must reject it
-**before buffering it**, then close the connection and fail the transfer. That
-ordering is the actual point of the limit: a host on the local network must not
-be able to make the receiver allocate an arbitrary amount of memory by
-announcing one enormous frame.
+A frame larger than 64 KiB is a protocol violation. The receiver must reject it,
+then close the connection and fail the transfer. The intent is that a host on the
+local network must not be able to make the receiver allocate an arbitrary amount
+of memory by announcing one enormous frame.
+
+### 33.4.1 What the limit actually guarantees
+
+This was originally specified as "reject before buffering". That is not
+achievable with `dart:io` and the specification has been corrected to match
+reality rather than left as an unimplemented promise.
+
+`dart:io` materialises a complete WebSocket frame into a `Uint8List` before the
+application sees it, and exposes no hook to inspect a frame's size before that
+happens. The platform has therefore already allocated the oversized frame by the
+time any Dart code can react to it.
+
+What the limit does guarantee:
+
+- the frame is never **processed**: not copied, not written to disk, not decoded,
+  and never handed to the transfer layer;
+- the connection is closed on the first violation, so the peer cannot keep the
+  receiver busy by repeating the attempt — the exposure is one allocation per
+  connection, not a sustained flood;
+- the check is not advisory. A relaxed check would remove all three properties,
+  so it must never become a warning.
+
+A genuinely pre-allocation bound would require a transport that parses frame
+headers itself. That is out of scope for `dart:io` and is recorded here as an
+accepted platform limitation, not as an oversight.
 
 64 KiB applies to binary data frames. Control messages are JSON text and are
 small by construction, so they share the same ceiling rather than getting a

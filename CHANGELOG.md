@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Transport foundation** (`core/network`): `WebSocketTransport` as the
+  project-owned contract, with `DartIoWebSocketTransport` as its only
+  `dart:io` implementation. Pinned `wss://`, control in text frames and file
+  bytes in binary frames on one connection, a 64 KiB frame ceiling, and one
+  transfer at a time. Covered by integration tests against a real TLS WebSocket
+  server, including the case that matters most: a certificate that does not
+  match the pin is refused rather than connected to unverified, and is reported
+  as a pairing failure so a retry cannot bury it. Registered in the DI container
+  as a factory, because it owns a socket and must not be shared across sessions.
+  Adds `crypto`, the Dart team's package, for SHA-256: `dart:io` exposes only
+  SHA-1 for certificates and hand-rolling a hash is not acceptable.
+
 - Architecture specification: feature-first Clean Architecture, dependency
   direction, package isolation matrix, and abstraction matrix.
 - Core error model: sealed `Failure` hierarchy covering the categories named in
@@ -49,6 +61,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CODE_OF_CONDUCT.md`, `CHANGELOG.md`.
 
 ### Changed
+
+- **Protocol**: the 64 KiB limit was specified as "reject before buffering".
+  That is not possible with `dart:io`, which materialises a whole frame before
+  application code can inspect it, so the specification was corrected to state
+  what the limit actually guarantees: the frame is never processed, written or
+  decoded, and the connection closes on the first violation. Recorded as a
+  platform limitation rather than left as an unimplemented promise.
 
 - **Protocol**: approved wire framing — control messages in WebSocket text
   frames, file bytes in binary frames, on one connection (`docs/PROTOCOL.md`

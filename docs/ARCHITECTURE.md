@@ -1892,6 +1892,43 @@ The following matrix defines the intended boundaries:
 
 ---
 
+# 69.1 Transport Foundation
+
+`core/network` holds the realtime transport and nothing else. It exists because
+the wire contract is decided while the message schema is not, so the two can be
+built and reviewed independently.
+
+```text
+lib/core/network/
+├── certificate_fingerprint.dart   SHA-256(DER), lowercase hex
+├── transport_frame.dart           frames, events, kMaxFrameBytes
+├── websocket_transport.dart       the project-owned contract
+└── dart_io_websocket_transport.dart   the only file touching dart:io sockets
+```
+
+`WebSocketTransport` is the boundary. Above it, nothing sees a `WebSocket`, a
+`Stream<dynamic>` or a `dart:io` exception: frames arrive as `ControlReceived`
+and `DataReceived`, and `dart:io`'s text-versus-binary distinction is normalised
+inside the implementation so it cannot leak.
+
+It owns only what is decided:
+
+- `wss://` with a pinned certificate;
+- control in text frames, file bytes in binary frames, on one connection;
+- a 64 KiB frame ceiling;
+- one transfer at a time per connection.
+
+It deliberately owns nothing about the JSON message schema, which is still open.
+That is the reason `ControlFrame` carries text rather than a typed model: the
+message names and envelope are not approved, and binding them into the transport
+now would make every schema change a transport change.
+
+`DartIoWebSocketTransport` is registered in the DI container as a **factory**,
+not a singleton. It owns a socket and a frame stream, so two sessions sharing one
+instance would mean two owners for one connection.
+
+---
+
 # 70. Abstraction Matrix
 
 The project intentionally uses these abstractions:

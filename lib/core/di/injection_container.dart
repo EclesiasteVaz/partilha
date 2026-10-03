@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:partilha/core/logging/logging.dart';
+import 'package:partilha/core/network/network.dart';
 
 /// The application service locator.
 ///
@@ -84,5 +85,11 @@ class InjectionContainer {
 void configureDependencies({required AppLogger logger}) {
   injectionContainer
     ..registerLazySingleton<AppLogger>(() => logger)
-    ..registerLazySingleton<LogSink>(ConsoleLogSink.new);
+    ..registerLazySingleton<LogSink>(ConsoleLogSink.new)
+    // A factory, not a singleton: a transport owns a socket and a frame stream,
+    // so sharing one across sessions would mean two owners for the same
+    // connection. Each pairing or transfer session resolves its own.
+    ..registerFactory<WebSocketTransport>(
+      () => DartIoWebSocketTransport(injectionContainer.resolve<AppLogger>()),
+    );
 }
