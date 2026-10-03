@@ -23,7 +23,8 @@ In scope:
 
 ## 3. Current Status
 
-**PARTIALLY IMPLEMENTED — spike code only. No user-facing behaviour exists.**
+**PARTIALLY IMPLEMENTED — provider validated on macOS. Still no user-facing
+behaviour exists, and the feature remains blocked on Android.**
 
 What exists:
 
@@ -44,10 +45,27 @@ The feature is still **blocked** for real use: the provider is unvalidated on
 hardware, and the checklist in `docs/decisions/0002-mdns-provider.md` is
 unticked. Nothing here has been run against a real network.
 
-The service type and TXT keys used here remain provisional: the exact values are
-`OPEN — APPROVAL REQUIRED` in `docs/PROTOCOL.md` §7.2. `serviceType` is
-`_partilha._tcp` and the TXT keys are `name` and `id`, chosen so the spike has
-something concrete to exercise. They are not a protocol claim.
+The service type and TXT keys used here remain provisional: §7.2.1 of
+`docs/PROTOCOL.md` now *proposes* `_partilha._tcp.local.` with TXT `name`/`id`,
+and §7.3.1 proposes a single `file-transfer` capability, but neither is approved.
+They were chosen first so the spike had something concrete to exercise, and the
+macOS run is evidence that they work, not authority to ship them.
+
+Two bugs were found by running the spike and are fixed:
+
+- `SO_REUSEPORT` is required on macOS. The host's own mDNS responder already
+  holds `0.0.0.0:5353`, so the bind failed with `EADDRINUSE` and `mdns_dart`
+  reported only "Failed to create any multicast sockets".
+- The query doubled the domain: `_partilha._tcp.local.local.`, because the
+  service type was passed with its domain and the client appends one itself. No
+  responder can answer that. It looked exactly like an empty network.
+
+`tool/spike/mdns_spike.dart` runs the probes on demand and reports which
+checklist items it could not cover. Reproduce with:
+
+```bash
+dart run tool/spike/mdns_spike.dart selftest
+```
 
 ## 4. User Problem
 
