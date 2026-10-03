@@ -368,11 +368,22 @@ For example:
 
 ```dart
 abstract interface class DiscoveryService {
-  Stream<DiscoveredDevice> discover();
-  Future<void> startAdvertising(DiscoveredDevice device);
-  Future<void> stopAdvertising();
+  Future<Result<List<DiscoveredDevice>, Failure>> discover();
+  Future<Result<void, Failure>> startAdvertising({
+    required String deviceId,
+    required String deviceName,
+    required int port,
+    required Map<String, String> capabilities,
+  });
+  Future<Result<void, Failure>> stopAdvertising();
 }
 ```
+
+Discovery returns a bounded single-shot result rather than a live stream, so
+that "no devices found yet" and "discovery ended" stay distinguishable instead
+of both presenting as a stream that never yields. A long-lived stream remains an
+open question. `startAdvertising` deliberately has no `token` parameter: that is
+how the "token never in mDNS" rule is enforced structurally.
 
 The concrete implementation may use an mDNS package, but the rest of the application does not need to know which package is being used.
 

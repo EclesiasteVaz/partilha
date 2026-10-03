@@ -50,6 +50,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Discovery spike**: added `DiscoveryService` and `DiscoveredDevice` to
+  `features/discovery/domain`, with `MdnsDiscoveryService` and
+  `DiscoveredDeviceMapper` in `features/discovery/data`. `mdns_dart` is imported
+  in no other file, so the provider stays replaceable.
+
+  This is spike code with no user-facing behaviour: no use case, controller or
+  screen exists, and nothing has been run against a real network. The Android
+  `MulticastLock` is **not** implemented, so discovery cannot yet work on a real
+  Android device. The provider remains unvalidated and
+  `docs/decisions/0002-mdns-provider.md` is unticked.
+
+  Two deliberate departures from the sketched contract, both recorded in
+  `features/discovery/FEATURE.md` §17: discovery returns a bounded
+  `Result<List<DiscoveredDevice>, Failure>` rather than a live `Stream`, because
+  a stream would make "found nothing yet" and "finished" indistinguishable; and
+  `startAdvertising` has no `token` parameter, which makes the "token never in
+  mDNS" rule structural rather than conventional.
+
 - **Transport**: replaced Socket.IO with a raw WebSocket over `dart:io`.
   Socket.IO was not implementable for Flutter↔Flutter — the only Dart server
   speaks protocol v2.0.1 while the maintained Dart client speaks v4.x, and

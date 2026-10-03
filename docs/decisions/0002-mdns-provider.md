@@ -69,15 +69,41 @@ avaliada. As opções de fallback estão listadas abaixo.
 ```text
 [ ] Anuncia um serviço e um host mdns_dart / avahi-browse / dns-sd o descobre
 [ ] Descobre um serviço anunciado por mdns_dart
-[ ] TXT records são lidos e escritos correctamente
+[x] TXT records são lidos e escritos correctamente  ← unit test, sem rede
 [ ] Endereços IPv4 são resolvidos e são o endereço correcto da interface
 [ ] Funciona em Android (device real, com MulticastLock)
 [ ] Funciona em macOS (device real)
 [ ] Anunciar e procurar ao mesmo tempo não interfere
-[ ] Parar de anunciar limpa o estado (sem servicios fantasma)
+[ ] Parar de anunciar limpa o estado (sem serviços fantasma)
 [ ] Performance aceitável: sem bloqueio perceptível da UI
 [ ] Sem crash em interface sem multicast / airplane mode
 ```
+
+## Estado do spike
+
+**Iniciado, não concluído.** Ver §3 de `features/discovery/FEATURE.md`.
+
+Escrito e compilado:
+
+- `DiscoveryService` + `DiscoveredDevice` (domínio);
+- `MdnsDiscoveryService` (dados), com `mdns_dart` importado exclusivamente aí;
+- `DiscoveredDeviceMapper`, com unit tests para as regras de validação do
+  registo não-confiável.
+
+Nada disto foi executado contra uma rede real. Os itens acima continuam por
+verificar, e dois bloqueiam a conclusão do spike:
+
+- **`MulticastLock` do Android não está implementado.** Sem ele, discovery falha
+  silenciosamente em muitos dispositivos Android, portanto o item Android não
+  pode passar mesmo com o resto pronto.
+- **Seleção de interface continua por decidir.** A implementação anuncia todos os
+  endereços não-loopback em vez de escolher um; numa máquina com Wi-Fi e
+  Ethernet pode anunciar um endereço que o sender não consegue alcançar.
+
+Nota de risco: `mdns_dart` 2.2.2 tem 11 stars, 4 issues abertos e foi publicado
+em 2025-06. É um port da implementação mDNS da HashiCorp em Go, o que é
+favorável, mas a maturidade é baixa. Tratar como dependência de risco e
+manter o `DiscoveryService` substituível.
 
 ## Consequências
 

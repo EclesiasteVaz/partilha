@@ -23,10 +23,22 @@ In scope:
 
 ## 3. Current Status
 
-**NOT IMPLEMENTED.**
+**PARTIALLY IMPLEMENTED — spike code only. No user-facing behaviour exists.**
 
-Additionally, this feature is **blocked**. The mDNS provider is not yet chosen.
-See Open Questions and `docs/decisions/0002-mdns-provider.md`.
+What exists:
+
+- `DiscoveryService` (domain contract) and `DiscoveredDevice`;
+- `MdnsDiscoveryService` + `DiscoveredDeviceMapper` (data), isolating
+  `mdns_dart` behind the contract with `mdns_dart` imported in no other file;
+- unit tests for the record-validation trust boundary.
+
+What does **not** exist: use cases, a `DiscoveryController`, a device list, or
+anything wired into the app. `mdns_dart` is added to `pubspec.yaml` and compiled
+but never invoked at runtime.
+
+The feature is still **blocked** for real use: the provider is unvalidated on
+hardware, and the checklist in `docs/decisions/0002-mdns-provider.md` is
+unticked. Nothing here has been run against a real network.
 
 ## 4. User Problem
 
@@ -179,12 +191,30 @@ The UI must not know that mDNS exists.
 
 ```text
 DiscoveryService
-    Stream<DiscoveredDevice> discover()
-    Future<void> startAdvertising(DiscoveredDevice self)
-    Future<void> stopAdvertising()
+    Future<Result<List<DiscoveredDevice>, Failure>> discover()
+    Future<Result<void, Failure>> startAdvertising({
+        required String deviceId,
+        required String deviceName,
+        required int port,
+        required Map<String, String> capabilities,
+    })
+    Future<Result<void, Failure>> stopAdvertising()
 ```
 
-Final contract is fixed at implementation time and recorded here.
+Two deliberate departures from the original sketch:
+
+- **A bounded single-shot result, not a `Stream`.** The provider collects a
+  fixed response window. Returning a stream would make "found nothing yet" and
+  "discovery finished" indistinguishable, both presenting as a stream that never
+  yields (`AGENTS.md` §83). A live stream that reports departure as well as
+  arrival is an open question (§34).
+- **`startAdvertising` takes no `token`.** The "token never in mDNS" rule is then
+  structural instead of a convention someone can forget
+  (`docs/decisions/0003-token-fora-do-mdns.md`).
+
+Validation lives in `DiscoveredDeviceMapper`, not in the service, because
+FEATURE.md §29 requires the mapping rules to be unit-testable and they are
+untestable through a socket call.
 
 ## 18. Application Layer
 
@@ -317,11 +347,26 @@ Authority: `docs/SECURITY.md` §11.1 and
 
 ## 30. Known Limitations
 
-- Not implemented.
-- Provider unchosen.
+- **No user-facing behaviour.** This is spike code; see §3.
+- Provider unvalidated: the spike checklist in
+  `docs/decisions/0002-mdns-provider.md` is entirely unticked.
 - The official `multicast_dns` package cannot announce and is therefore
   insufficient.
 - Known macOS camera/socket bugs in popular mDNS packages are unresolved.
+- **Android `MulticastLock` is not implemented.** Discovery silently fails on
+  many Android devices without it (§19). Not written yet, so the spike cannot
+  pass its Android checklist item.
+- **Interface selection is undecided** (§34). `MdnsDiscoveryService` advertises
+  every non-loopback address rather than guessing; on a dual-homed machine that
+  may advertise an address the sender cannot reach.
+- **Metadata length limits are provisional** (64 chars). §12 requires approval.
+- `DiscoveredDevice` does not use Freezed. The spike does not justify a
+  code-generation step for a five-field value object (`AGENTS.md` §55), but
+  AGENTS.md §9 prefers Freezed for entities — **decide deliberately before this
+  feature grows**, rather than letting the spike's choice stand by accident.
+- A record with **no TXT payload is dropped**, because `ServiceEntry.isComplete`
+  requires one. Partilha always advertises TXT, so this is treated as "not a
+  Partilha receiver". Worth confirming against real peers.
 
 ## 31. Out of Scope
 
@@ -347,6 +392,9 @@ None is scheduled.
 | Receiver announces, sender searches — do not reverse | `docs/ARCHITECTURE.md` §36 |
 | mDNS isolated behind `DiscoveryService` | `AGENTS.md` §35 |
 | Provider is `mdns_dart`, pending spike | `docs/decisions/0002-mdns-provider.md` |
+| Discovery is a bounded result, not a live stream | §17 of this document |
+| `startAdvertising` cannot carry a token | §17 of this document |
+| `DiscoveredDevice` is a plain immutable class, not Freezed | §17 of this document |
 | Token never in discovery metadata | `docs/decisions/0003-token-fora-do-mdns.md` |
 
 ## 34. Open Questions
@@ -361,4 +409,7 @@ None is scheduled.
 - whether advertising continues while the app is backgrounded;
 - whether discovery is cancelled automatically on app background.
 
-No Discovery implementation may begin until the provider spike is complete.
+No Discovery *feature* work — use cases, controllers, UI — may begin until the
+provider spike is complete on real hardware. The spike's own isolation and
+validation code is the only thing permitted before then, which is what this
+document currently describes.
