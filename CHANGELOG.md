@@ -77,11 +77,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "primary target, not implemented" in both status locations (`AGENTS.md`
   §41.1).
 
-- **Interface selection isolated**: `LocalAddressResolver` makes the
-  still-undecided policy a single injected, testable decision instead of logic
-  inside a socket call. Defaults to every non-loopback address, the only default
-  that cannot make a network silently undiscoverable. Three options are listed in
-  `features/discovery/FEATURE.md` §34; none is chosen yet.
+- **Interface selection**: decided in `features/discovery/FEATURE.md` §34.1. The
+  receiver advertises the addresses its listening socket is bound to, which makes
+  this a transport concern rather than a discovery one;
+  `LocalAddressResolver` is the seam, and the current
+  `AllNonLoopbackAddresses` is correct only because the transport will bind to
+  `0.0.0.0`.
+
+  "Prefer the interface carrying the default route" was rejected: under an
+  active VPN the default route points at the VPN, which is the opposite of the
+  right answer for LAN peers, and it fails silently. Filtering interfaces by name
+  (`utun`, `docker`, `br-`) was rejected as premature, since the names differ per
+  platform and the heuristic would look deliberate while being wrong elsewhere.
 
   Two deliberate departures from the sketched contract, both recorded in
   `features/discovery/FEATURE.md` §17: discovery returns a bounded

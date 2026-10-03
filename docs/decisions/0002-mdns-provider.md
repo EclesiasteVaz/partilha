@@ -102,11 +102,14 @@ Estado dos dois bloqueios identificados quando o spike foi iniciado:
   foi confirmada no pacote final. Falta executar num dispositivo Android real.
   Como a falha que previne é silenciosa, este item não pode ser dado como
   cumprido só porque compila.
-- **Seleção de interface: decisão isolada, política por escolher.** A escolha
-  passou a ser `LocalAddressResolver`, injektado e testável, com
-  `AllNonLoopbackAddresses` como default. `startAdvertising` aceita
-  `interfaceName`. As três opções concretas estão listadas em
-  `features/discovery/FEATURE.md` §34; nenhuma foi escolhida.
+- **Seleção de interface: decidida** (`features/discovery/FEATURE.md` §34.1).
+  O receiver anuncia os endereços aos quais o seu socket de escuta está ligado,
+  pelo que isto é uma propriedade do transporte e não da discovery.
+  `LocalAddressResolver` é a costura; a implementação actual
+  (`AllNonLoopbackAddresses`) é correcta apenas porque o transporte vai fazer
+  bind a `0.0.0.0`. "Preferir a interface da rota por defeito" foi rejeitado: com
+  uma VPN activa a rota por defeito aponta para a VPN, que é o oposto da resposta
+  correcta, e falha em silêncio.
 
 Nota de risco: `mdns_dart` 2.2.2 tem 11 stars, 4 issues abertos e foi publicado
 em 2025-06. É um port da implementação mDNS da HashiCorp em Go, o que é

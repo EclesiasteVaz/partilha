@@ -420,17 +420,10 @@ None is scheduled.
 - final mDNS provider, pending the spike in ADR 0002;
 - exact mDNS service type and TXT-record keys (`docs/PROTOCOL.md` §7.2);
 - maximum field lengths for every metadata field;
-- which local interface is advertised when several exist. Now a single decision
-  point (`LocalAddressResolver`), defaulting to every non-loopback address,
-  which is the only default that cannot make a network silently
-  undiscoverable. Three concrete options, none chosen:
-  1. keep advertising every non-loopback address (current default) — peers pick
-     the address that answers, but a VPN or docker interface is also published;
-  2. prefer the interface carrying the default route — needs native help to read
-     the routing table, and still guesses on multi-homed hosts;
-  3. derive the address from the socket the receiver is already listening on —
-     the most correct source of truth, but it requires the transport to exist
-     first, so it cannot be adopted before the transport milestone;
+- whether the sender must try every advertised address in order until one
+  connects, or whether it stops at the first. The chosen interface policy below
+  is only robust on a multi-homed host if the sender does try them, so this is a
+  dependency on the transport milestone rather than a free choice. See §34.1;
 - announcement interval and whether it backs off;
 - whether advertising continues while the app is backgrounded;
 - whether discovery is cancelled automatically on app background.
@@ -439,3 +432,41 @@ No Discovery *feature* work — use cases, controllers, UI — may begin until t
 provider spike is complete on real hardware. The spike's own isolation and
 validation code is the only thing permitted before then, which is what this
 document currently describes.
+
+## 34.1 Interface selection: decided
+
+Which local interface to advertise is **decided**, and it was not a choice
+between candidate interfaces. The listener already owns the answer.
+
+**Decision: the receiver advertises the addresses its listening socket is bound
+to.** A socket bound to `0.0.0.0` is reachable on every interface, so
+advertising every one of them is *correct* rather than an approximation. A
+socket bound to a specific address advertises only that address. The transport
+owns this fact, so discovery receives reachable addresses instead of guessing
+them.
+
+Consequences:
+
+- Interface selection is a **transport** concern, not a discovery concern.
+  `LocalAddressResolver` is the seam; its implementation becomes
+  transport-owned once transport exists.
+- Until then, `AllNonLoopbackAddresses` is the correct interim implementation,
+  and only because the transport will bind to `0.0.0.0`. That assumption is
+  stated rather than implied: if the transport ever binds to a single address,
+  this default becomes wrong and must be replaced.
+
+**Rejected: prefer the interface carrying the default route.** It answers "which
+interface would reach the internet", not "which interface reaches peers on the
+LAN". Under an active VPN or split-tunnel the default route points at the VPN,
+which is the opposite of the right answer, and it fails silently. This option
+should not be revived.
+
+**Known limitation of the interim default**: it publishes every non-loopback
+address, including a VPN or container interface if one is up. On the LAN this is
+tolerable only because a peer picks the address that answers. That tolerance
+depends on the open question in §34 about the sender trying every address, so
+the interim default is not a final answer.
+
+Rejected as premature: filtering interfaces by name (`utun`, `docker`, `br-`).
+The names differ per platform, so the heuristic would be right on macOS and
+wrong elsewhere while looking deliberate.
