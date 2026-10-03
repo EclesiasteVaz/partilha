@@ -489,13 +489,42 @@ accepted
 rejected
 ```
 
-The exact rejection reasons must be defined by the protocol.
+### 14.1 Error representation: APPROVED
 
-**OPEN — APPROVAL REQUIRED**
+**Errors are a dedicated `error` message, not a field on every response.**
 
-The Agent must not invent a large error/rejection taxonomy.
+```json
+{
+  "type": "error",
+  "id": "t-1",
+  "payload": { "code": "insufficient_storage", "message": "..." }
+}
+```
 
-Only reasons required by the actual MVP behavior should be introduced.
+`id` refers to the request being answered, so the sender knows which transfer the
+failure belongs to. A dedicated message keeps `payload` free of error shapes, so
+each message type validates one structure instead of two, and lets the receiver
+handle a failure the same way regardless of which request produced it.
+
+### 14.2 Error codes: APPROVED
+
+The set is deliberately minimal. Each code maps to exactly one `Failure`
+constant that already exists in the codebase, which is what makes this a
+derivation rather than an invented taxonomy:
+
+| Code | Failure constant | Required by |
+|---|---|---|
+| `invalid_message` | `TransferFailure.protocolViolation` | §28 malformed messages |
+| `not_paired` | `PairingFailure.rejected` | §37 pairing, token not accepted |
+| `transfer_rejected` | `TransferFailure.remoteRejected` | §14 the user declined the offer |
+| `insufficient_storage` | `StorageFailure.insufficientSpace` | §22 storage validation |
+| `unsupported` | `TransferFailure.remoteRejected` | §10 capability mismatch |
+
+`cancelled` is deliberately **absent**: cancellation is its own message type, not
+an error, and encoding it twice would leave two ways to say the same thing.
+
+Adding a code requires approval, because the peer must understand it to react to
+it. An unrecognised code from a future peer is handled by §27.1.
 
 ---
 
@@ -781,11 +810,25 @@ If a device receives an unknown message type, it must not:
 - crash the application;
 - corrupt transfer state.
 
-The implementation should reject or safely ignore the message according to the final error-handling contract.
+### 27.1 Unknown message: APPROVED
 
-**OPEN — APPROVAL REQUIRED**
+**An unrecognised message type is logged and ignored. The connection stays open.**
 
-The exact unknown-message behavior must be explicitly defined before final protocol implementation.
+The distinction that matters is between a message this version does not
+understand and a message that violates the contract:
+
+```text
+unknown type      → log, ignore, keep the connection
+malformed content → violation, close the connection (§28)
+```
+
+A peer speaking a slightly different dialect must not be able to destroy work in
+progress. Ignoring keeps a transfer alive when the other device introduces a
+message type this version has never heard of; closing would turn any future
+addition into a compatibility incident for transfers currently running.
+
+This is not a licence to be lax: an unknown *type* is tolerated, a known type
+with invalid contents is still a violation.
 
 ---
 
@@ -1235,35 +1278,50 @@ UI state is derived from application/domain state.
 
 The following decisions are intentionally unresolved and require explicit approval before implementation:
 
-### 41.1 Exact message names
+### 41.1 Exact message names: APPROVED (naming convention)
 
-Define final values for:
+Message names are **`snake_case` strings** in the envelope's `type` field:
 
-```text
-connection
-pairing
-capability exchange
-transfer request
-acceptance
-rejection
-progress
-completion
-cancellation
-error
+```json
+{"type": "transfer_request", "id": "t-1", "payload": {}}
 ```
 
-### 41.2 Exact JSON envelope
+Chosen over integer opcodes because a log becomes `{"type": 7}`, which sends the
+next person to the source to find what 7 means. The extra bytes are irrelevant
+next to file payloads, and a wrong value is self-evident in a dump rather than
+looking like a valid number.
 
-Define the final structure surrounding:
+Still open: **which** messages exist. The list still depends on the handshake and
+token presentation, so no message type is defined until that is approved.
 
-```text
-type
-payload
-identifier
-error
+### 41.2 JSON envelope: APPROVED
+
+Every control message uses the same envelope:
+
+```json
+{
+  "type": "transfer_request",
+  "id": "t-1",
+  "payload": { "fileName": "photo.jpg", "size": 1234 }
+}
 ```
 
-if those fields are required.
+- `type` — the `snake_case` discriminator from §41.1. Always present.
+- `id` — correlates a response or an error with its request.
+- `payload` — the message's own fields. Always present, `{}` when empty.
+
+Uniform on purpose. It makes validation mechanical: check that `type` is a known
+string, that `payload` is an object, and the shape of `payload` is then the only
+per-type concern. A message with unknown fields at the top level instead has no
+way to be recognised as unknown without first guessing its shape.
+
+`id` is not optional. Without it there is no way to answer a specific request,
+and adding it later would be a contract change the other side cannot understand.
+
+`payload` is always present rather than omitted when empty, so decoding never has
+to distinguish "absent" from "empty".
+
+Errors are a separate `error` message (§14.1), not a field on this envelope.
 
 ### 41.3 mDNS service type
 
