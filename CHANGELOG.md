@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Control message codec** (`core/protocol`): the trust boundary for the
+  control channel, and the only place JSON is parsed. Frames are treated as
+  untrusted input, so the decoder distinguishes three outcomes rather than
+  throwing: understood, unknown `type`, and malformed. An unknown type is logged
+  and ignored with the connection left open (§27.1), while a malformed frame is
+  a contract violation that closes it (§28). Collapsing those two would mean a
+  peer speaking a slightly different dialect could destroy a transfer in
+  progress. The malformed reason never echoes the frame itself, because that
+  frame is untrusted and may carry a token or file names, and logging it verbatim
+  would write those to disk (§52). Carries the five approved error codes from
+  §14.2, each traceable to a `Failure` constant that already existed, plus §14.1
+  and §41.2: one envelope for every message, `id` required so a failure can be
+  correlated with its request, and `payload` always present so decoding never has
+  to tell "absent" from "empty". An unrecognised code from a future peer is kept
+  verbatim and carries no local failure, which is what lets §27.1 apply to it.
+  Error frames are built in exactly one place, so the enum name and the wire
+  spelling cannot drift apart — a mistake the first test run actually caught,
+  since `json_serializable` writes an enum by its Dart name by default. Adds
+  `freezed`, `json_serializable` and `build_runner`, per §9.
+
 - **Transport foundation** (`core/network`): `WebSocketTransport` as the
   project-owned contract, with `DartIoWebSocketTransport` as its only
   `dart:io` implementation. Pinned `wss://`, control in text frames and file
