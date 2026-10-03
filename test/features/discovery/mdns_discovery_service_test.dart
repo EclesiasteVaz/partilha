@@ -37,6 +37,25 @@ void main() {
     responseTimeout: const Duration(milliseconds: 50),
   );
 
+  group('SO_REUSEPORT defaults to on', () {
+    // Regression guard for a macOS blocker found by the spike. A host's own mDNS
+    // responder already holds UDP 5353 on the wildcard address, so without
+    // SO_REUSEPORT every bind fails with EADDRINUSE and mdns_dart reports only
+    // "Failed to create any multicast sockets". Android may need the opposite,
+    // which is why this is asserted as a default rather than hard-coded: see
+    // docs/decisions/0002-mdns-provider.md.
+    test('is enabled unless a caller deliberately turns it off', () {
+      expect(serviceWith(lock: FakeMulticastLock()).reusePort, isTrue);
+
+      final MdnsDiscoveryService off = MdnsDiscoveryService(
+        hostName: 'test-device',
+        multicastLock: FakeMulticastLock(),
+        reusePort: false,
+      );
+      expect(off.reusePort, isFalse);
+    });
+  });
+
   group('multicast lock lifecycle', () {
     test('a discovery query acquires the lock before sending traffic', () async {
       final FakeMulticastLock lock = FakeMulticastLock();
