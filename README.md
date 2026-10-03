@@ -906,7 +906,7 @@ works there.
 
 | Platform | Folder | Status | Built / tested |
 |---|---|---|---|
-| Android | `android/` | **Primary target** — not implemented yet | No |
+| Android | `android/` | **Primary target** — not implemented yet | APK builds; never run on a device |
 | macOS | `macos/` | **Primary target** — not implemented yet | No |
 | iOS | `ios/` | Scaffold only | No |
 | Windows | `windows/` | Scaffold only | No |
@@ -923,8 +923,14 @@ Status vocabulary:
   built nor tested, and no behaviour is guaranteed.
 
 Architectural readiness is not platform support. No feature is implemented on
-any platform at this point, and no platform-specific behaviour has been
-validated on real hardware.
+any platform at this point.
+
+The first platform-specific behaviour now exists: the Android
+`WifiManager.MulticastLock`, isolated behind
+`core/platform/multicast_lock.dart`. An APK was built to confirm the Kotlin side
+compiles and that `CHANGE_WIFI_MULTICAST_STATE` reaches the manifest. **It has
+never been run on a physical device**, so Android remains unimplemented rather
+than supported.
 
 Additional platforms may have different capabilities or platform-specific
 implementations. Platform-specific behavior should be isolated behind

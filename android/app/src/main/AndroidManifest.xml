@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required by WifiManager.MulticastLock. Without it Android silently drops
+         the multicast traffic mDNS discovery depends on, and the result is an
+         empty device list rather than an error. Normal permission, so no runtime
+         prompt is involved. See core/platform/multicast_lock.dart. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
+
     <application
         android:label="partilha"
         android:name="${applicationName}"

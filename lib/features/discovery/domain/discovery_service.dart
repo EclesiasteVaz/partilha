@@ -28,11 +28,16 @@ abstract interface class DiscoveryService {
   /// is not a parameter, which is how the "token never in mDNS" rule is
   /// enforced structurally instead of by convention
   /// (`docs/decisions/0003-token-fora-do-mdns.md`).
+  ///
+  /// [interfaceName] restricts the announcement to one local interface, e.g.
+  /// `wlan0`. Null lets the implementation apply its default policy, which is
+  /// still `OPEN — APPROVAL REQUIRED` (`features/discovery/FEATURE.md` §24, §34).
   Future<Result<void, Failure>> startAdvertising({
     required String deviceId,
     required String deviceName,
     required int port,
     required Map<String, String> capabilities,
+    String? interfaceName,
   });
 
   /// Stops announcing and releases multicast resources.

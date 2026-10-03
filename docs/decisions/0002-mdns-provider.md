@@ -91,14 +91,22 @@ Escrito e compilado:
   registo não-confiável.
 
 Nada disto foi executado contra uma rede real. Os itens acima continuam por
-verificar, e dois bloqueiam a conclusão do spike:
+verificar.
 
-- **`MulticastLock` do Android não está implementado.** Sem ele, discovery falha
-  silenciosamente em muitos dispositivos Android, portanto o item Android não
-  pode passar mesmo com o resto pronto.
-- **Seleção de interface continua por decidir.** A implementação anuncia todos os
-  endereços não-loopback em vez de escolher um; numa máquina com Wi-Fi e
-  Ethernet pode anunciar um endereço que o sender não consegue alcançar.
+Estado dos dois bloqueios identificados quando o spike foi iniciado:
+
+- **`MulticastLock` do Android: implementado, por verificar em hardware.**
+  `core/platform/multicast_lock.dart` expõe a abstracção, `MainActivity.kt`
+  implementa o lado nativo com contagem de referências, e
+  `CHANGE_WIFI_MULTICAST_STATE` está no manifest. O APK compila e a permissão
+  foi confirmada no pacote final. Falta executar num dispositivo Android real.
+  Como a falha que previne é silenciosa, este item não pode ser dado como
+  cumprido só porque compila.
+- **Seleção de interface: decisão isolada, política por escolher.** A escolha
+  passou a ser `LocalAddressResolver`, injektado e testável, com
+  `AllNonLoopbackAddresses` como default. `startAdvertising` aceita
+  `interfaceName`. As três opções concretas estão listadas em
+  `features/discovery/FEATURE.md` §34; nenhuma foi escolhida.
 
 Nota de risco: `mdns_dart` 2.2.2 tem 11 stars, 4 issues abertos e foi publicado
 em 2025-06. É um port da implementação mDNS da HashiCorp em Go, o que é

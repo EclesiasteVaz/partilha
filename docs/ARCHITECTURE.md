@@ -1301,7 +1301,7 @@ counterpart of the table in `README.md`, and both must be updated together.
 
 | Platform | Folder | Status | Built / tested |
 |---|---|---|---|
-| Android | `android/` | Primary target, not implemented | No |
+| Android | `android/` | Primary target, not implemented | APK builds; never run on a device |
 | macOS | `macos/` | Primary target, not implemented | No |
 | iOS | `ios/` | Scaffold only | No |
 | Windows | `windows/` | Scaffold only | No |
@@ -1332,6 +1332,45 @@ for a working platform. To keep that mistake detectable:
   test run (§64);
 - limitations are recorded in `features/<feature>/FEATURE.md`, never inferred
   from the existence of a folder.
+
+---
+
+# 48.2 Platform Services
+
+Platform differences that more than one feature needs are isolated as
+project-owned services under `lib/core/platform/`, rather than being scattered
+as `Platform.is*` checks through the codebase (§41).
+
+## MulticastLock
+
+`core/platform/multicast_lock.dart` exists because Android silently drops
+multicast traffic for an app that has not acquired
+`WifiManager.MulticastLock`. Silent is the dangerous part: discovery finds
+nothing, which is indistinguishable from an empty network rather than from a
+bug. The lock also costs power, so it is held only while discovery runs.
+
+- `createMulticastLock()` is the only place in the app that branches on the
+  platform for multicast.
+- `MethodChannelMulticastLock` reaches Android over the
+  `partilha/multicast_lock` channel and maps platform errors to typed
+  `Failure`s.
+- `UnrestrictedMulticastLock` is used on platforms that do not restrict
+  multicast.
+- A `MissingPluginException` is treated as success, so callers never need their
+  own platform check.
+
+The Android side declares `CHANGE_WIFI_MULTICAST_STATE` in the manifest and
+reference-counts the lock in `MainActivity.kt`.
+
+### Why this is not a PermissionService concern
+
+`CHANGE_WIFI_MULTICAST_STATE` is a normal install-time permission: it is granted
+when the app is installed and never prompts the user, so it does not go through
+`PermissionService` (§40). That service exists for runtime permissions that the
+user can deny and that the app must react to. Discovery currently requests no
+runtime permission. Introducing an empty `PermissionService` now would be
+speculative; it should arrive with the first feature that actually needs a
+runtime permission.
 
 ---
 

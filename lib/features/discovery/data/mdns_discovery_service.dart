@@ -2,8 +2,10 @@ import 'dart:io';
 
 import 'package:mdns_dart/mdns_dart.dart';
 import 'package:partilha/core/errors/failure.dart';
+import 'package:partilha/core/platform/platform.dart';
 import 'package:partilha/core/result/result.dart';
 import 'package:partilha/features/discovery/data/discovered_device_mapper.dart';
+import 'package:partilha/features/discovery/data/local_address_resolver.dart';
 import 'package:partilha/features/discovery/domain/discovered_device.dart';
 import 'package:partilha/features/discovery/domain/discovery_service.dart';
 
@@ -17,7 +19,9 @@ import 'package:partilha/features/discovery/domain/discovery_service.dart';
 class MdnsDiscoveryService implements DiscoveryService {
   MdnsDiscoveryService({
     required this.hostName,
+    required this.multicastLock,
     this.responseTimeout = const Duration(seconds: 3),
+    this.addressResolver = const AllNonLoopbackAddresses(),
   });
 
   /// Host name announced in the SRV record.
@@ -28,6 +32,17 @@ class MdnsDiscoveryService implements DiscoveryService {
 
   /// Trust boundary where untrusted records are validated and translated.
   final DiscoveredDeviceMapper _mapper = const DiscoveredDeviceMapper();
+
+  /// Held while multicast traffic flows, because Android drops it otherwise.
+  final MulticastLock multicastLock;
+
+  /// Decides which local addresses are announced. Injected so the selection
+  /// policy is one testable decision rather than logic inside the socket call.
+  final LocalAddressResolver addressResolver;
+
+  /// Whether this service currently holds the platform multicast lock.
+  bool get holdsMulticastLock => _multicastLockHeld;
+  bool _multicastLockHeld = false;
 
   /// mDNS service type for Partilha receivers.
   ///
@@ -57,6 +72,14 @@ class MdnsDiscoveryService implements DiscoveryService {
 
   @override
   Future<Result<List<DiscoveredDevice>, Failure>> discover() async {
+    // Acquired for the duration of the query only. Held longer it would keep the
+    // Wi-Fi radio awake for no benefit; not held at all, Android silently drops
+    // the traffic and discovery looks like an empty network.
+    final Result<void, Failure> lockResult = await _acquireLock();
+    if (lockResult case Err(:final error)) {
+      return Result<List<DiscoveredDevice>, Failure>.failure(error);
+    }
+
     try {
       final List<ServiceEntry> entries = await MDNSClient.discover(
         '$serviceType.$_domain.',
@@ -88,7 +111,22 @@ class MdnsDiscoveryService implements DiscoveryService {
       return const Result<List<DiscoveredDevice>, Failure>.failure(
         DiscoveryFailure.transportFailed,
       );
+    } finally {
+      await _releaseLock();
     }
+  }
+
+  Future<Result<void, Failure>> _acquireLock() async {
+    if (_multicastLockHeld) return const Result<void, Failure>.success(null);
+    final Result<void, Failure> result = await multicastLock.acquire();
+    if (result.isSuccess) _multicastLockHeld = true;
+    return result;
+  }
+
+  Future<void> _releaseLock() async {
+    if (!_multicastLockHeld) return;
+    _multicastLockHeld = false;
+    await multicastLock.release();
   }
 
   @override
@@ -97,6 +135,7 @@ class MdnsDiscoveryService implements DiscoveryService {
     required String deviceName,
     required int port,
     required Map<String, String> capabilities,
+    String? interfaceName,
   }) async {
     if (isAdvertising) {
       // Re-advertising without stopping leaks the previous socket and can leave
@@ -106,8 +145,17 @@ class MdnsDiscoveryService implements DiscoveryService {
       );
     }
 
+    // Held for as long as the advertisement is live, then released by
+    // stopAdvertising. A lock left held keeps the Wi-Fi radio awake indefinitely.
+    final Result<void, Failure> lockResult = await _acquireLock();
+    if (lockResult case Err(:final error)) {
+      return Result<void, Failure>.failure(error);
+    }
+
     try {
-      final List<InternetAddress> addresses = await _localAddresses();
+      final List<InternetAddress> addresses = await addressResolver.resolve(
+        interfaceName: interfaceName,
+      );
       if (addresses.isEmpty) {
         // Advertising a loopback address would produce an announcement no peer
         // can reach, which is worse than not announcing at all.
@@ -144,6 +192,13 @@ class MdnsDiscoveryService implements DiscoveryService {
       return const Result<void, Failure>.failure(
         DiscoveryFailure.transportFailed,
       );
+    } finally {
+      // Every exit path that never reached a running server must give the lock
+      // back. The early return for "no usable address" sits inside this try,
+      // so without this it would strand the hold and keep the Wi-Fi radio awake
+      // for the rest of the process (§81). A successful start keeps the hold,
+      // and stopAdvertising is what releases it.
+      if (_server == null) await _releaseLock();
     }
   }
 
@@ -160,26 +215,10 @@ class MdnsDiscoveryService implements DiscoveryService {
       return const Result<void, Failure>.failure(
         DiscoveryFailure.transportFailed,
       );
+    } finally {
+      // Released even when the socket failed to close: a leaked lock outlives
+      // the screen and keeps the radio awake for the rest of the process (§81).
+      await _releaseLock();
     }
-  }
-
-  /// Resolves the addresses to advertise.
-  ///
-  /// Which local interface is advertised when a machine has several is
-  /// `OPEN — APPROVAL REQUIRED` (`features/discovery/FEATURE.md` §24, §34), so
-  /// this returns every non-loopback address and lets the provider decide. That
-  /// is the honest state of the question: guessing a single interface here would
-  /// make a dual-homed machine undiscoverable from one of its networks.
-  Future<List<InternetAddress>> _localAddresses() async {
-    final List<InternetAddress> found = <InternetAddress>[];
-    final List<NetworkInterface> interfaces = await NetworkInterface.list(
-      includeLoopback: false,
-    );
-    for (final NetworkInterface interface in interfaces) {
-      for (final InternetAddress address in interface.addresses) {
-        if (!address.isLoopback) found.add(address);
-      }
-    }
-    return found;
   }
 }

@@ -56,10 +56,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in no other file, so the provider stays replaceable.
 
   This is spike code with no user-facing behaviour: no use case, controller or
-  screen exists, and nothing has been run against a real network. The Android
-  `MulticastLock` is **not** implemented, so discovery cannot yet work on a real
-  Android device. The provider remains unvalidated and
-  `docs/decisions/0002-mdns-provider.md` is unticked.
+  screen exists, and nothing has been run against a real network. The provider
+  remains unvalidated and `docs/decisions/0002-mdns-provider.md` is unticked.
+
+- **Platform services**: added `core/platform/multicast_lock.dart`, the first
+  project-owned platform service. Android silently drops multicast traffic
+  without `WifiManager.MulticastLock`, and it does so silently enough that
+  discovery looks like an empty network rather than a bug. The Android side is
+  implemented in `MainActivity.kt` with reference counting, and
+  `CHANGE_WIFI_MULTICAST_STATE` is declared in the manifest. The lock is
+  released in a `finally` on every exit path, because a stranded lock keeps the
+  Wi-Fi radio awake for the rest of the process.
+
+  Discovery requests no runtime permission, so it does not use
+  `PermissionService`: the multicast permission is install-time and never
+  prompts. An empty `PermissionService` was deliberately not created.
+
+  An APK was built to confirm the Kotlin side compiles and the permission
+  reaches the package. **It has never run on a device**, so Android stays
+  "primary target, not implemented" in both status locations (`AGENTS.md`
+  §41.1).
+
+- **Interface selection isolated**: `LocalAddressResolver` makes the
+  still-undecided policy a single injected, testable decision instead of logic
+  inside a socket call. Defaults to every non-loopback address, the only default
+  that cannot make a network silently undiscoverable. Three options are listed in
+  `features/discovery/FEATURE.md` §34; none is chosen yet.
 
   Two deliberate departures from the sketched contract, both recorded in
   `features/discovery/FEATURE.md` §17: discovery returns a bounded

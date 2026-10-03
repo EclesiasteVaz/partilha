@@ -28,9 +28,13 @@ In scope:
 What exists:
 
 - `DiscoveryService` (domain contract) and `DiscoveredDevice`;
-- `MdnsDiscoveryService` + `DiscoveredDeviceMapper` (data), isolating
-  `mdns_dart` behind the contract with `mdns_dart` imported in no other file;
-- unit tests for the record-validation trust boundary.
+- `MdnsDiscoveryService` + `DiscoveredDeviceMapper` + `LocalAddressResolver`
+  (data), isolating `mdns_dart` behind the contract with `mdns_dart` imported in
+  no other file;
+- `MulticastLock` in `core/platform`, with the Android implementation over a
+  method channel and `CHANGE_WIFI_MULTICAST_STATE` declared in the manifest;
+- unit tests for the record-validation trust boundary and for the lock
+  lifecycle.
 
 What does **not** exist: use cases, a `DiscoveryController`, a device list, or
 anything wired into the app. `mdns_dart` is added to `pubspec.yaml` and compiled
@@ -226,7 +230,11 @@ package imports.
 Owns `mdns_dart` entirely. Translates package exceptions into
 `DiscoveryFailure`.
 
-On Android this implementation is also responsible for the multicast lock.
+On Android this implementation is also responsible for the multicast lock, via
+`core/platform/multicast_lock.dart`. The lock is acquired around each query and
+held while an advertisement is live, then released in a `finally` so no exit path
+can strand it. A lock left held keeps the Wi-Fi radio awake for the rest of the
+process.
 
 ## 20. Presentation Layer
 
@@ -267,11 +275,16 @@ registry in the MVP.
 
 - Android and macOS are priority targets.
 - Android requires a multicast lock; otherwise discovery silently fails on many
-  devices.
+  devices. Implemented in `core/platform/multicast_lock.dart` and declared as
+  `CHANGE_WIFI_MULTICAST_STATE` in the manifest. **Not yet run on a device.**
+- Discovery needs no runtime permission, so it does not use `PermissionService`.
+  The multicast permission is install-time and never prompts (§40).
 - Interface selection matters when a machine has multiple interfaces (Wi-Fi and
   Ethernet). Which address is advertised is not yet defined — see Open
-  Questions.
-- Do not scatter `Platform.is*` through the feature.
+  Questions. The decision is isolated in `LocalAddressResolver` so it can be
+  changed in one place.
+- Do not scatter `Platform.is*` through the feature. `createMulticastLock()` is
+  the single platform branch for multicast.
 
 ## 25. Performance Requirements
 
@@ -353,12 +366,15 @@ Authority: `docs/SECURITY.md` §11.1 and
 - The official `multicast_dns` package cannot announce and is therefore
   insufficient.
 - Known macOS camera/socket bugs in popular mDNS packages are unresolved.
-- **Android `MulticastLock` is not implemented.** Discovery silently fails on
-  many Android devices without it (§19). Not written yet, so the spike cannot
-  pass its Android checklist item.
-- **Interface selection is undecided** (§34). `MdnsDiscoveryService` advertises
-  every non-loopback address rather than guessing; on a dual-homed machine that
-  may advertise an address the sender cannot reach.
+- **`MulticastLock` is implemented but unverified on a device.** The APK builds
+  and the permission reaches the manifest, but no physical Android device has
+  run it. The failure this prevents is silent, so it must be confirmed on
+  hardware before discovery is trusted (§19, §24).
+- **Interface selection is still a policy decision** (§34). It is now a single
+  injected collaborator, `LocalAddressResolver`, defaulting to
+  `AllNonLoopbackAddresses`, and `startAdvertising` accepts an `interfaceName`.
+  That makes the decision testable and swappable without touching the socket
+  call, but it does not decide the policy. See §34.
 - **Metadata length limits are provisional** (64 chars). §12 requires approval.
 - `DiscoveredDevice` does not use Freezed. The spike does not justify a
   code-generation step for a five-field value object (`AGENTS.md` §55), but
@@ -404,7 +420,17 @@ None is scheduled.
 - final mDNS provider, pending the spike in ADR 0002;
 - exact mDNS service type and TXT-record keys (`docs/PROTOCOL.md` §7.2);
 - maximum field lengths for every metadata field;
-- which local interface is advertised when several exist;
+- which local interface is advertised when several exist. Now a single decision
+  point (`LocalAddressResolver`), defaulting to every non-loopback address,
+  which is the only default that cannot make a network silently
+  undiscoverable. Three concrete options, none chosen:
+  1. keep advertising every non-loopback address (current default) — peers pick
+     the address that answers, but a VPN or docker interface is also published;
+  2. prefer the interface carrying the default route — needs native help to read
+     the routing table, and still guesses on multi-homed hosts;
+  3. derive the address from the socket the receiver is already listening on —
+     the most correct source of truth, but it requires the transport to exist
+     first, so it cannot be adopted before the transport milestone;
 - announcement interval and whether it backs off;
 - whether advertising continues while the app is backgrounded;
 - whether discovery is cancelled automatically on app background.
