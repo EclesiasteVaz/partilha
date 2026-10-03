@@ -324,9 +324,32 @@ Example conceptual representation:
   "host": "...",
   "port": 0000,
   "token": "...",
+  "certificateFingerprint": "...",
   "capabilities": []
 }
 ```
+
+`certificateFingerprint` is **required**, not optional. It was added as a direct
+consequence of approving `wss://` with a pinned certificate
+(`docs/SECURITY.md` §26.1): the sender must be able to verify the certificate
+*before* it sends the token, and the QR is the only channel that reaches the
+sender before a connection exists.
+
+Two properties follow, and both matter:
+
+- The fingerprint travels in the QR alongside the token, so it inherits the
+  QR's protection. It is never sent over the connection, so a passive
+  eavesdropper on a later connection learns nothing that helps them impersonate
+  the device.
+- Because the fingerprint arrives out-of-band, pinning has **no trust-on-first-
+  use window**. There is no first connection during which an attacker could
+  substitute their own certificate. This is the reason the design was chosen
+  over TOFU.
+
+This changes the QR payload contract and therefore affects interoperability
+between versions. It is recorded here as an approved consequence of the
+transport-encryption decision rather than as a separate invention; a change that
+contradicts it must be approved separately.
 
 This example is illustrative only.
 
@@ -915,19 +938,93 @@ Base64 would inflate every payload by roughly one third and force the whole
 file through a JSON string, which defeats the streaming and memory requirements
 in `AGENTS.md`.
 
-The following remain undecided:
+### 33.2 Discriminator: APPROVED
 
-**OPEN — APPROVAL REQUIRED**
+**Control traffic travels in WebSocket text frames. File bytes travel in
+WebSocket binary frames. One connection carries both.**
 
-- The exact discriminator between a control frame and a data frame.
-- Whether the discriminator is an envelope type, a channel id, or a dedicated
-  opcode.
-- Message ordering guarantees the receiver may rely on.
-- Whether and how frame sizes are negotiated.
-- Maximum accepted frame size, and the behavior when it is exceeded.
+This was chosen over a custom envelope, a channel id or an opcode prefix
+because the transport already distinguishes the two, and duplicating that
+distinction inside the payload adds cost without adding safety.
 
-The Agent must not invent a framing scheme. Transport code must not be written
-until this is approved.
+What this satisfies:
+
+- File bytes are sent as binary frames and are **never** base64-encoded, so a
+  file streams with no extra allocation and no size inflation.
+- Control messages are never inside the file byte stream. A text frame is a
+  separate frame; it cannot be interleaved into the byte stream itself.
+- The two are unambiguous by construction, because they are different frame
+  types. There is no field that can be malformed into ambiguity.
+
+Accepted costs, stated rather than discovered later:
+
+- `dart:io` surfaces both as a single `Stream<dynamic>`, so the receiver
+  discriminates by element type. The transport layer must normalise this at its
+  own boundary instead of leaking it upward.
+- A text frame **could** be sent in the middle of a binary file transfer. The
+  protocol defines the handling of that case explicitly rather than assuming it
+  cannot happen; see §33.3.
+- **Concurrent transfers cannot share one connection**, because frames are not
+  tagged with a transfer id. This is resolved in §33.6 by serializing transfers.
+
+### 33.3 A control frame during a file stream: APPROVED
+
+A text frame arriving while a file transfer is streaming is a **protocol
+violation**, not a control message for that transfer.
+
+Rationale: silently accepting it would mean a sender could interleave control
+traffic into bytes the receiver is already writing, and the receiver would have
+no way to distinguish an intended message from a desynchronised stream. Failing
+loudly is the only behaviour that preserves the integrity of the destination
+file. It surfaces as `TransferFailure` and is not retryable as-is; the transfer
+restarts from the beginning under the bounded retry policy.
+
+### 33.4 Frame size limit: APPROVED
+
+**Maximum frame size is 64 KiB, fixed. It is not negotiated.**
+
+A frame larger than 64 KiB is a protocol violation. The receiver must reject it
+**before buffering it**, then close the connection and fail the transfer. That
+ordering is the actual point of the limit: a host on the local network must not
+be able to make the receiver allocate an arbitrary amount of memory by
+announcing one enormous frame.
+
+64 KiB applies to binary data frames. Control messages are JSON text and are
+small by construction, so they share the same ceiling rather than getting a
+second, separately documented limit.
+
+Frames are chunks of a file, never the file itself, so this bound does not
+constrain file size. It only bounds how much memory one transfer holds at a
+time, which is what keeps streaming viable under the memory requirements in
+`AGENTS.md`.
+
+### 33.5 Ordering: APPROVED
+
+Frames are delivered in the order they were sent.
+
+This is not a negotiated guarantee and needs no protocol support: a WebSocket
+carries a single ordered byte stream over TCP, which already preserves order.
+Recording it here because the receiver is entitled to rely on it — the sender
+cannot reorder file chunks, and a receiver must not be written to expect
+otherwise.
+
+The guarantee is scoped to one connection. It says nothing about ordering across
+transfers, because transfers are serialized (§33.6).
+
+### 33.6 Transfers are serialized: APPROVED
+
+**One transfer is active at a time, on one connection. The connection is reused
+for the next transfer only after the current one finishes.**
+
+This follows from §33.2: frames carry no transfer id, so two file streams on one
+connection could not be told apart. Rather than extend the framing, the MVP
+serializes. It also matches the queue semantics already documented in
+`features/file_transfer/FEATURE.md` §12, where transfers proceed in order and one
+failure does not stop the queue.
+
+The cost is accepted and visible: a large file delays the rest of the queue.
+This is a deliberate MVP limitation, not an oversight. Supporting parallel
+transfers later requires an explicit change to §33.2, not just new code.
 
 ---
 

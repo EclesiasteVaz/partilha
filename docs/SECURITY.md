@@ -677,16 +677,72 @@ validation rules.
 
 **OPEN — APPROVAL REQUIRED**
 
-Transport encryption is not defined. The following must be explicitly approved
-before the Agent implements the transport:
+**APPROVED: `wss://` with the certificate fingerprint pinned from the QR.**
 
-- whether the MVP runs `ws://` (plaintext) or `wss://` (TLS);
-- if TLS, how the self-signed certificate is generated, pinned, and verified;
-- if plaintext, what the accepted exposure is and how it is presented to users.
+### Why plaintext was rejected
 
-A self-signed certificate is not automatically trustworthy: without an explicit
-pinning or trust-on-first-use model, TLS offers authentication that a MITM can
-forge. The Agent must not assume `wss://` alone solves this.
+The pairing token is what establishes trust between devices. Under `ws://` it
+travels in cleartext, so any host on the local network could capture it and then
+present themselves as the paired device. That does not weaken the security
+model, it removes it: a token-based model over plaintext offers no protection
+against a passive attacker, and the token would be the only thing standing
+between an eavesdropper and full impersonation.
+
+`wss://` on its own would not have been enough either. A self-signed
+certificate is not automatically trustworthy, so without pinning a MITM can
+present a forged certificate and the connection would still succeed.
+
+### How pinning works
+
+The receiver generates a self-signed certificate per device and publishes its
+**SHA-256 fingerprint** in the QR payload
+(`docs/PROTOCOL.md` §8). The sender pins that fingerprint and refuses the
+connection when the presented certificate does not match.
+
+Because the fingerprint arrives **out of band**, in the QR, before any
+connection exists, there is **no trust-on-first-use window**. There is no first
+connection during which an attacker could substitute their own certificate and
+have it silently accepted. This is the decisive reason for pinning from the QR
+rather than TOFU.
+
+Consequences worth stating:
+
+- The token and the fingerprint travel together in the QR, which is the only
+  channel allowed to carry the token. Neither is ever sent over the connection.
+- A changed or regenerated certificate invalidates existing pairings. The user
+  must re-pair. This is intentional: silently accepting a new certificate is the
+  TOFU weakness this design avoids.
+- Pinning is enforced in the transport layer and must not be made optional by a
+  caller.
+
+### Fingerprint encoding: APPROVED
+
+**SHA-256 over the certificate's full DER encoding, lowercase hex.**
+
+Hashing the whole certificate rather than its SPKI keeps this free of ASN.1
+parsing, and it is consistent with the behavior already approved above: a
+certificate that is changed or regenerated invalidates the pairing and the user
+re-pairs. SPKI pinning would tolerate a renewal that reuses the same key pair,
+but that tolerance is not needed for a persisted certificate and is not worth
+the parsing complexity in the MVP.
+
+If the project later needs to renew certificates without invalidating pairings,
+that is a deliberate change to this decision, not a bug fix.
+
+### TLS configuration: platform defaults
+
+Cipher suites and the TLS version floor are left to the platform defaults.
+
+This is a local implementation decision rather than an open protocol question:
+modern Android and macOS already refuse weak ciphers and obsolete protocol
+versions by default. Hard-coding a suite list in the application would add a
+second source of truth that drifts as the platforms are updated, without making
+the connection meaningfully stronger. Pinning, not cipher configuration, is what
+carries the security here.
+
+This is recorded explicitly so it is a decision rather than an omission. If
+platform defaults are ever found to permit an unacceptable configuration, the
+floor must be set here.
 
 See also `docs/decisions/0001-transporte-websocket-dart-io.md`.
 

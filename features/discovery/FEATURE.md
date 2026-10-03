@@ -44,6 +44,11 @@ The feature is still **blocked** for real use: the provider is unvalidated on
 hardware, and the checklist in `docs/decisions/0002-mdns-provider.md` is
 unticked. Nothing here has been run against a real network.
 
+The service type and TXT keys used here remain provisional: the exact values are
+`OPEN — APPROVAL REQUIRED` in `docs/PROTOCOL.md` §7.2. `serviceType` is
+`_partilha._tcp` and the TXT keys are `name` and `id`, chosen so the spike has
+something concrete to exercise. They are not a protocol claim.
+
 ## 4. User Problem
 
 Two devices on the same Wi-Fi have no way to find each other without the user
@@ -201,6 +206,7 @@ DiscoveryService
         required String deviceName,
         required int port,
         required Map<String, String> capabilities,
+        String? interfaceName,
     })
     Future<Result<void, Failure>> stopAdvertising()
 ```

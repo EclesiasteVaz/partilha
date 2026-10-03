@@ -38,7 +38,16 @@ Not supported in the MVP:
 
 **NOT IMPLEMENTED.**
 
-Blocked on unresolved protocol and security decisions. See Open Questions.
+Two previously blocking decisions are now approved:
+
+- wire framing: control in text frames, file bytes in binary frames
+  (`docs/PROTOCOL.md` §33.2);
+- transport encryption: `wss://` with the certificate fingerprint pinned from
+  the QR (`docs/SECURITY.md` §26.1).
+
+Still blocked on: maximum frame size, the integrity mechanism, the transfer
+identifier format, the handshake, the reconnection policy, the concurrency
+policy, and the retryability classification. See Open Questions.
 
 ## 4. User Problem
 
@@ -440,21 +449,31 @@ None is scheduled.
 
 ## 34. Open Questions
 
-**OPEN — APPROVAL REQUIRED**
+Resolved:
 
-- the exact wire framing between control messages and file bytes
-  (`docs/PROTOCOL.md` §33.1) — **this blocks transport implementation**;
-- transport encryption: `ws://` or `wss://`, and if TLS, how a self-signed
-  certificate is pinned (`docs/SECURITY.md` §26.1);
-- maximum frame size, maximum message size, and the resource limits;
-- integrity mechanism: checksum algorithm, and whether it is mandatory;
+- wire framing: control in text frames, file bytes in binary frames
+  (`docs/PROTOCOL.md` §33.2);
+- a text frame during a file stream is a protocol violation (§33.3);
+- maximum frame size: 64 KiB fixed, rejected before buffering (§33.4);
+- ordering: send order, guaranteed by the underlying stream (§33.5);
+- concurrency: serialized, one at a time on a single connection (§33.6);
+- transport encryption: `wss://` with the DER SHA-256 fingerprint pinned from
+  the QR, cipher suites left to platform defaults
+  (`docs/SECURITY.md` §26.1).
+
+Still **OPEN — APPROVAL REQUIRED**:
+
 - the exact transfer identifier format;
-- the connection handshake and how the token is presented;
+- the connection handshake, and how the token is presented;
+- the integrity mechanism: checksum algorithm, and whether it is mandatory;
 - whether a dropped connection during an active transfer is automatically
   resumed or requires a fresh pairing;
-- concurrency policy: are transfers serialized, or parallel with bounded
-  concurrency, and what is the bound;
 - the retryability classification for "peer unavailable after pairing".
 
-No File Transfer implementation may begin until framing and transport
-encryption are approved.
+The exact message names and JSON envelope remain open in `docs/PROTOCOL.md`
+§41.1 and §41.2, and gate the control-message layer.
+
+File Transfer implementation may now begin, bounded by the items above. The
+transport foundation — connection establishment with pinning, frame
+classification, and the frame size limit — depends on none of them and can be
+built first.

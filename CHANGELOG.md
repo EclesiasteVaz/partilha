@@ -50,6 +50,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Protocol**: approved wire framing — control messages in WebSocket text
+  frames, file bytes in binary frames, on one connection (`docs/PROTOCOL.md`
+  §33.2). Chosen because the transport already distinguishes the two, so no
+  custom envelope, channel id or opcode prefix is needed and file bytes stay raw.
+  The accepted costs are recorded rather than left to be discovered: one
+  connection cannot carry concurrent transfers, and a text frame arriving
+  mid-file is defined as a protocol violation (§33.3) rather than tolerated,
+  because accepting it would let a sender interleave control traffic into bytes
+  already being written.
+
+- **Security**: approved `wss://` with the certificate fingerprint pinned from
+  the QR (`docs/SECURITY.md` §26.1). Plaintext was rejected because it does not
+  weaken the token model, it removes it: the token would be readable by any host
+  on the LAN. TLS alone was insufficient because a self-signed certificate is
+  forgeable. Pinning from the QR has no trust-on-first-use window, which was the
+  deciding factor against TOFU.
+
+  This adds a required `certificateFingerprint` field to the QR payload, so the
+  payload contract changes. Recorded as a consequence of the approved decision,
+  and a later change contradicting it needs its own approval.
+
 - **Discovery spike**: added `DiscoveryService` and `DiscoveredDevice` to
   `features/discovery/domain`, with `MdnsDiscoveryService` and
   `DiscoveredDeviceMapper` in `features/discovery/data`. `mdns_dart` is imported
