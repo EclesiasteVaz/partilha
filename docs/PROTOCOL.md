@@ -263,13 +263,44 @@ to harvest it and impersonate this device, which contradicts the approved
 security model in `docs/SECURITY.md`. The token travels only through the QR
 code. See `docs/decisions/0003-token-fora-do-mdns.md`.
 
-The exact mDNS service name/type and TXT-record schema are implementation-level protocol details and must be defined before implementation.
+### 7.2.1 Service type and TXT keys: PROPOSTO
 
-**OPEN — APPROVAL REQUIRED**
+**This section is a proposal. It is not approved, and the implementation must not
+treat it as a contract until it is.**
 
-The exact mDNS service type and TXT-record keys must be explicitly approved before the Agent implements them.
+```text
+service type   _partilha._tcp.local.
+```
 
-The Agent must not invent arbitrary service names or metadata fields.
+`_tcp` rather than a bespoke type such as `_partilha-share._tcp`: the protocol
+needs discovery and a port, and `_tcp` already means exactly that to every
+resolver on the network. A bespoke type buys nothing and makes the service
+invisible to standard tooling, which is the one thing worth having here.
+
+TXT keys:
+
+| Key | Carries | Rule |
+|---|---|---|
+| `name` | human-readable device name | user-defined, never derived from a hostname (§34) |
+| `id` | stable device identifier | opaque to peers, never a token (§7.2) |
+
+Two keys, and no more. `host` and `port` already have their own records (SRV and
+A/AAAA), so duplicating them in TXT would create two sources of truth for the
+same fact. Capabilities are proposed separately in §7.3.
+
+Both keys are **required**. An advertisement missing either is rejected rather
+than defaulted: `name` falling back to the DNS hostname would leak the machine's
+name onto the network, which is the leak §34 exists to prevent.
+
+**Evidence from the spike.** These values are not arbitrary. `mdns_dart` has
+advertised `_partilha._tcp.local.` with TXT `name`/`id` on a real macOS network,
+and Apple's own resolver — `/usr/bin/dns-sd`, which shares no code with the
+library — discovered it, resolved the SRV to the right port and read the TXT
+records. See `docs/decisions/0002-mdns-provider.md`. What is *not* proven is
+Android, where the spike is still unticked.
+
+**Still to approve:** the service type itself, and whether a missing key rejects
+the record rather than defaulting.
 
 ### 7.3 Discovery metadata is untrusted input
 
@@ -404,9 +435,39 @@ multiple-files
 
 These are examples, not an approved exhaustive list.
 
-**OPEN — APPROVAL REQUIRED**
+### 7.3.1 Capability identifiers: PROPOSTO
 
-The final capability identifiers and semantics must be explicitly defined before capability negotiation is implemented.
+**This section is a proposal. It is not approved.**
+
+```text
+capability   value
+```
+
+Where capability is a single flag whose presence is the whole signal. A
+capability set is a set of keys; a key that is absent is a capability the device
+does not have.
+
+Proposed for the MVP:
+
+| Identifier | Meaning |
+|---|---|
+| `file-transfer` | this device can receive files |
+
+That is deliberately the whole list. `AGENTS.md` §35 forbids advertising
+functionality the implementation cannot execute, and there is exactly one
+capability the MVP has. `multiple-files` appears in this section as an example
+and is **not** proposed: §25 says the MVP supports multiple selection, but that
+is a receiver-side behaviour, and a sender cannot verify it before connecting.
+Advertising it would mean asserting something unverified.
+
+**Alternative not chosen — versioned values.** `file-transfer=2` style values
+imply a compatibility scheme this protocol does not have (§38: no protocol
+versioning). A capability is present or absent; when its behaviour changes
+materially, the identifier changes.
+
+**Still to approve:** whether capabilities exist in the MVP at all. The sender
+can discover a device and try to connect; if the MVP has one capability, the
+field earns its place only if a future feature needs it.
 
 The Agent must not create an extensive capability registry without approval.
 

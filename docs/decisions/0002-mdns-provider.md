@@ -67,31 +67,58 @@ avaliada. As opções de fallback estão listadas abaixo.
 ## O que o spike tem de validar
 
 ```text
-[ ] Anuncia um serviço e um host mdns_dart / avahi-browse / dns-sd o descobre
-[ ] Descobre um serviço anunciado por mdns_dart
-[x] TXT records são lidos e escritos correctamente  ← unit test, sem rede
-[ ] Endereços IPv4 são resolvidos e são o endereço correcto da interface
+[x] Anuncia um serviço e um host mdns_dart / avahi-browse / dns-sd o descobre
+[x] Descobre um serviço anunciado por mdns_dart
+[x] TXT records são lidos e escritos correctamente  ← unit test + rede real
+[x] Endereços IPv4 são resolvidos e são o endereço correcto da interface
 [ ] Funciona em Android (device real, com MulticastLock)
 [ ] Funciona em macOS (device real)
-[ ] Anunciar e procurar ao mesmo tempo não interfere
-[ ] Parar de anunciar limpa o estado (sem serviços fantasma)
+[x] Anunciar e procurar ao mesmo tempo não interfere
+[x] Parar de anunciar limpa o estado (sem serviços fantasma)
 [ ] Performance aceitável: sem bloqueio perceptível da UI
 [ ] Sem crash em interface sem multicast / airplane mode
 ```
 
+Executado em macOS com `dart run tool/spike/mdns_spike.dart selftest`. Os três
+primeiros itens foram confirmados com `/usr/bin/dns-sd`, que não partilha código
+com `mdns_dart`: o Bonjour do sistema anuncia o registo, resolve o SRV para
+`MacBookPro.local.:42424` e lê o TXT `name=Probe Mac id=probe-mac`.
+
+"Funciona em macOS (device real)" continua por assinalar: isto correu numa
+única máquina, não entre dois dispositivos.
+
+### Dois bugs encontrados, ambos corrigidos
+
+1. **`SO_REUSEPORT` é obrigatório no macOS.** O responder mDNS do próprio host já
+   detém `0.0.0.0:5353`, por isso o bind falha com `EADDRINUSE` e o `mdns_dart`
+   reporta apenas "Failed to create any multicast sockets" — sem mencionar a
+   porta nem a causa. Confirmado que `dart:io` puro faz bind e join sem
+   dificuldade, o que isolou o problema na biblioteca e não no ambiente.
+2. **Domínio duplicado na consulta.** Passávamos `_partilha._tcp.local.` ao
+   cliente, que acrescenta o domínio por si: a query saía para
+   `_partilha._tcp.local.local.` e nenhum responder responde a isso. Descobriu-se
+   porque `dns-sd` via o mesmo registo que a nossa query não via.
+
+O segundo é o caso que justifica o harness: uma falha de descoberta aparece
+identicamente a "não há dispositivos na rede", e sem um verificador independente
+seria fácil aceitar essa explicação errada.
+
 ## Estado do spike
 
-**Iniciado, não concluído.** Ver §3 de `features/discovery/FEATURE.md`.
+**Avançado. Validado em macOS; por validar em Android real.** Ver §3 de
+`features/discovery/FEATURE.md`.
 
 Escrito e compilado:
 
 - `DiscoveryService` + `DiscoveredDevice` (domínio);
 - `MdnsDiscoveryService` (dados), com `mdns_dart` importado exclusivamente aí;
 - `DiscoveredDeviceMapper`, com unit tests para as regras de validação do
-  registo não-confiável.
+  registo não-confiável;
+- `tool/spike/mdns_spike.dart`, o harness que executa os probes e diz
+  explicitamente o que não verificou.
 
-Nada disto foi executado contra uma rede real. Os itens acima continuam por
-verificar.
+Isto já correu contra uma rede real em macOS. Os itens marcados na checklist
+continuam por verificar em Android.
 
 Estado dos dois bloqueios identificados quando o spike foi iniciado:
 
@@ -118,7 +145,10 @@ manter o `DiscoveryService` substituível.
 
 ## Consequências
 
-- Nenhum código de Discovery deve ser escrito antes do spike.
+- Nenhum código de Discovery deve ser escrito antes de o spike correr em
+  Android. O provider deixou de estar em dúvida sobre funcionar; falta saber se
+  `SO_REUSEPORT` é o correcto num handset, onde a biblioteca avisa que pode
+  ser o inverso.
 - Se o spike falhar, activamos o fallback (responder próprio) e **registamos uma
   nova ADR** em vez de editar esta.
 - A API do pacote nunca pode vazar para `domain/` ou `application/`.
