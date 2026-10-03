@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:mdns_dart/mdns_dart.dart';
 import 'package:partilha/core/errors/failure.dart';
-import 'package:partilha/core/platform/platform.dart';
+import 'package:partilha/core/platform/multicast_lock.dart';
 import 'package:partilha/core/result/result.dart';
 import 'package:partilha/features/discovery/data/discovered_device_mapper.dart';
 import 'package:partilha/features/discovery/data/local_address_resolver.dart';
@@ -22,6 +22,7 @@ class MdnsDiscoveryService implements DiscoveryService {
     required this.multicastLock,
     this.responseTimeout = const Duration(seconds: 3),
     this.addressResolver = const AllNonLoopbackAddresses(),
+    this.reusePort = true,
   });
 
   /// Host name announced in the SRV record.
@@ -39,6 +40,24 @@ class MdnsDiscoveryService implements DiscoveryService {
   /// Decides which local addresses are announced. Injected so the selection
   /// policy is one testable decision rather than logic inside the socket call.
   final LocalAddressResolver addressResolver;
+
+  /// Whether to ask the OS for `SO_REUSEPORT` on the mDNS socket.
+  ///
+  /// Must be true, and this is not a tuning knob. mDNS owns UDP 5353 and every
+  /// host already has a responder listening there: on macOS that is Bonjour's
+  /// `mDNSResponder`, which binds `0.0.0.0:5353`. Without `SO_REUSEPORT` a second
+  /// bind to the wildcard address fails with `EADDRINUSE`, and `mdns_dart`
+  /// reports it as "Failed to create any multicast sockets" — a message that
+  /// names neither the port nor the cause. Confirmed on macOS while running the
+  /// spike in `docs/decisions/0002-mdns-provider.md`: the server starts with this
+  /// set and throws without it.
+  ///
+  /// Defaults to true because a host running mDNS needs it on both sides.
+  /// Exposed so a test can reproduce the failing bind rather than only the
+  /// working one, and because `mdns_dart` itself warns that Android may need the
+  /// opposite. That trade-off can only be settled on a real device, so it stays
+  /// a parameter instead of being decided here.
+  final bool reusePort;
 
   /// Whether this service currently holds the platform multicast lock.
   bool get holdsMulticastLock => _multicastLockHeld;
@@ -81,9 +100,19 @@ class MdnsDiscoveryService implements DiscoveryService {
     }
 
     try {
+      // Same socket requirement as the server side, so the same flag decides
+      // both. See [reusePort]: the query binds UDP 5353 on the wildcard address,
+      // which the host's own responder already holds.
+      // The bare service type, not '$serviceType.$_domain.': the client appends
+      // the domain itself, so passing it here produced a query for
+      // "_partilha._tcp.local.local." that no responder can ever answer. Found by
+      // running the spike in `docs/decisions/0002-mdns-provider.md`, where the
+      // query went out and returned zero devices while `dns-sd` saw the same
+      // record fine.
       final List<ServiceEntry> entries = await MDNSClient.discover(
-        '$serviceType.$_domain.',
+        serviceType,
         timeout: responseTimeout,
+        reusePort: reusePort,
       );
 
       // Duplicate suppression: a device answers a query more than once, and the
@@ -180,7 +209,9 @@ class MdnsDiscoveryService implements DiscoveryService {
         ],
       );
 
-      final MDNSServer server = MDNSServer(MDNSServerConfig(zone: service));
+      final MDNSServer server = MDNSServer(
+        MDNSServerConfig(zone: service, reusePort: reusePort),
+      );
       await server.start();
       _server = server;
       return const Result<void, Failure>.success(null);
