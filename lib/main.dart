@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:partilha/core/di/di.dart';
 import 'package:partilha/core/logging/logging.dart';
+import 'package:partilha/core/routing/routing.dart';
 import 'package:partilha/core/theme/theme.dart';
 
 Future<void> main() async {
@@ -23,21 +24,25 @@ Future<void> main() async {
 
   logger.info('Partilha starting');
 
-  runApp(const PartilhaApp());
+  runApp(PartilhaApp(currentRoute: CurrentRoute()));
 }
 
 /// Root widget.
 ///
-/// Deliberately minimal. No home screen is invented: the first real screen
-/// belongs to a feature, and building one here would put product behaviour in
-/// the composition root. The design system (`AGENTS.md` §46) is wired up so
-/// feature screens inherit it.
+/// Owns the theme and the router, and nothing else: which screen is shown and
+/// what that screen does are the router's and the feature's business. Keeping
+/// the switch here would put product behaviour in the composition root, which is
+/// how a placeholder becomes permanent.
 class PartilhaApp extends StatelessWidget {
-  const PartilhaApp({super.key});
+  const PartilhaApp({required this.currentRoute, super.key});
+
+  /// The current route, owned here because the router delegate must not
+  /// outlive the widget that hosts it.
+  final CurrentRoute currentRoute;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Partilha',
       debugShowCheckedModeBanner: false,
       // Dark is the design target (AppTheme.mode); the light palette exists
@@ -45,56 +50,8 @@ class PartilhaApp extends StatelessWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: AppTheme.mode,
-      home: const PreImplementationNotice(),
-    );
-  }
-}
-
-/// States plainly that the app has no functionality yet.
-///
-/// Exists to replace the generated counter demo, which would otherwise make an
-/// unimplemented project look like a working one. It is removed as soon as
-/// the first real screen lands.
-class PreImplementationNotice extends StatelessWidget {
-  const PreImplementationNotice({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: AppSpacing.maxContentWidth,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                const AppIcon(AppIcons.info, size: AppIconSizes.xl),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  'Partilha',
-                  style: context.textStyles.displaySmall,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'Under construction. No feature is implemented yet.',
-                  style: context.textStyles.bodyLarge,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                Text(
-                  'Architecture and protocol are documented in docs/.',
-                  style: context.textStyles.bodySmall,
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      routerDelegate: AppRouterDelegate(currentRoute),
+      routeInformationParser: const AppRouteInformationParser(),
     );
   }
 }

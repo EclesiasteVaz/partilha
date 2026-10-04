@@ -1,6 +1,10 @@
 import 'package:get_it/get_it.dart';
 import 'package:partilha/core/logging/logging.dart';
 import 'package:partilha/core/network/network.dart';
+import 'package:partilha/features/settings/application/application.dart';
+import 'package:partilha/features/settings/data/data.dart';
+import 'package:partilha/features/settings/domain/domain.dart';
+import 'package:partilha/features/settings/presentation/presentation.dart';
 
 /// The application service locator.
 ///
@@ -91,5 +95,39 @@ void configureDependencies({required AppLogger logger}) {
     // connection. Each pairing or transfer session resolves its own.
     ..registerFactory<WebSocketTransport>(
       () => DartIoWebSocketTransport(injectionContainer.resolve<AppLogger>()),
+    )
+    // A lazy singleton because it owns the database handle, which must be one
+    // per process: a second handle would be a second connection with its own
+    // cache and its own view of what is committed (§80, §81).
+    ..registerLazySingleton<SettingsLocalDataSource>(
+      SqliteSettingsLocalDataSource.new,
+    )
+    ..registerLazySingleton<SettingsRepository>(
+      () => SqliteSettingsRepository(
+        injectionContainer.resolve<SettingsLocalDataSource>(),
+      ),
+    )
+    // Factories, not singletons: a use case holds no resource, and a screen owns
+    // its controller for as long as it is on screen. Making them singletons would
+    // mean the container decides their lifetime, which is the opposite of §81.
+    ..registerFactory<GetDeviceNameUseCase>(
+      () => GetDeviceNameUseCase(
+        injectionContainer.resolve<SettingsRepository>(),
+      ),
+    )
+    ..registerFactory<SaveDeviceNameUseCase>(SaveDeviceNameUseCase.new)
+    ..registerFactory<SettingsController>(
+      () => SettingsController(
+        getDeviceName: injectionContainer.resolve<GetDeviceNameUseCase>(),
+        saveDeviceName: injectionContainer.resolve<SaveDeviceNameUseCase>(),
+      ),
+    )
+    // The screen is a factory too, for the same reason as the controller: it is
+    // stateful, and a shared instance would keep one screen's text field alive
+    // after the screen is gone.
+    ..registerFactory<SettingsScreen>(
+      () => SettingsScreen(
+        controller: injectionContainer.resolve<SettingsController>(),
+      ),
     );
 }

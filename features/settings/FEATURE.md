@@ -24,10 +24,22 @@ accounts, profiles, theming controls, or a general key/value preference store.
 
 ## 3. Current Status
 
-**NOT IMPLEMENTED.**
+**IMPLEMENTED.** Device name only.
 
-No Dart code exists. `pubspec.yaml` contains only the default Flutter scaffold.
-This document is a contract, not a description of shipped behavior.
+```text
+lib/features/settings/
+├── domain/        DeviceName, SettingsRepository
+├── application/   GetDeviceNameUseCase, SaveDeviceNameUseCase
+├── data/          SettingsLocalDataSource, SqliteSettings*
+└── presentation/  SettingsController, SettingsScreen
+```
+
+This is the first implemented screen in the application. It replaced the
+`flutter create` placeholder, so the app now renders real UI rather than an
+"under construction" notice.
+
+Not implemented, and deliberately so: everything in §31. There is no
+preferences store beyond the single device-name row.
 
 ## 4. User Problem
 
@@ -103,17 +115,28 @@ No other input. Settings does not receive network input.
 
 ## 12. Validation
 
-Device name validation is **not yet specified**. See Open Questions.
+Implemented in `DeviceName.create`, which returns a `Result` rather than
+throwing: an empty or overlong name is an ordinary thing a user does, not a
+programming error (§83).
 
-Minimum expectations once defined:
+| Rule | Behavior | Failure |
+|---|---|---|
+| Surrounding whitespace | trimmed before judging and before storing | — |
+| Empty / whitespace only | rejected | `ValidationFailure.empty` |
+| Longer than 64 characters | rejected | `ValidationFailure.tooLong` |
+| C0 control chars or DEL | rejected | `ValidationFailure.malformed` |
 
-- must not be empty;
-- must have a bounded length (mDNS TXT records and the UI both have limits);
-- must not contain control characters;
-- must be rendered escaped, since it is display-only text arriving from another
-  device's perspective.
+Control characters are rejected rather than stripped, so the stored name and the
+advertised name cannot disagree.
 
-The Agent must not invent specific limits without approval.
+`DeviceName.maxLength = 64` is bounded by the mDNS TXT budget (§7.2) and by the
+peer list row. Approved by the maintainer on 2026-10-04; see §34.
+
+Unchanged from the contract: the name is rendered escaped, because it is
+display-only text arriving from another device's perspective.
+
+The value object, not the raw string, is what reaches Discovery, Pairing and
+persistence, so the rules cannot be re-decided per consumer.
 
 ## 13. Success Behavior
 
@@ -247,37 +270,93 @@ The device name is **display-only**. It is not a security boundary.
 
 ## 28. Edge Cases
 
-- name is empty → reject, see Open Questions;
-- name exceeds maximum length → reject;
-- name contains only whitespace → reject;
-- database is not yet migrated → read must fail cleanly, not crash;
+- name is empty → rejected with `ValidationFailure.empty`;
+- name exceeds 64 characters → rejected with `ValidationFailure.tooLong`;
+- name contains only whitespace → rejected after trimming;
+- name contains a control character, notably a newline → rejected, since an
+  unescaped newline could terminate a TXT record early;
+- nothing stored yet → the fallback `Partilha` is returned as a **success**, not
+  a failure, so a first run is not reported as an error;
+- a stored row that no longer validates, e.g. written before the limit changed
+  → the fallback is returned rather than an unusable name being advertised;
+- storage unavailable → `StorageFailure`, and the screen stays editable so the
+  one action that might recover is still available;
 - name changes while a transfer is in progress → the current transfer is
   unaffected; new advertisements use the new name.
 
+## 28.1 Behavior Detail Worth Knowing
+
+**The saved value is re-read after a write.** `SaveDeviceNameUseCase` trims, so
+the stored name may differ from what was typed; the controller reads it back so
+the field shows what was actually persisted. That read publishes
+`SettingsStatus.saved` rather than going through `load()`, because routing
+through `load()` would end in `ready` and the user would never see confirmation
+that the save worked.
+
+**A confirmation read that fails does not report the save as failed.** The write
+succeeded; claiming otherwise would tell the user their name was not saved when
+it was.
+
 ## 29. Testing Requirements
 
-**Unit**
+Implemented in `test/features/settings/`. Total suite: 277 tests.
 
-- repository read/write mapping;
-- name validation, once defined;
-- `Failure` conversion from sqflite exceptions.
+**Unit** — `domain/device_name_test.dart`
 
-**Integration**
+- accepted input: plain, accented, non-Latin, emoji, exactly at the limit;
+- rejected input: empty, whitespace only, over the limit, control characters;
+- trimming happens before judging;
+- value equality;
+- the fallback is not the machine hostname, which is the §34 leak this guards.
 
-- real sqflite round-trip, including a migration from a previous schema
-  version.
+Implemented in `application/settings_use_cases_test.dart`: reading, saving, and
+that an invalid name never reaches storage.
 
-**UI**
+Implemented in `data/sqlite_settings_repository_test.dart`: round trip, first-run
+fallback, a stored value that no longer validates, `StorageFailure` conversion,
+that a write failure is not retryable, and that the exception never reaches the
+caller.
 
-- renders loading, ready, saving, error;
-- saving a valid name updates the displayed value;
-- an invalid name surfaces an accessible error.
+**Integration** — `data/sqlite_settings_local_data_source_test.dart`
+
+Real SQLite through `sqflite_common_ffi` as a dev dependency, because mocking
+sqflite away would hide the schema and the upsert:
+
+- write then read; replace rather than duplicate; independent keys;
+- a value containing `'); DROP TABLE` is stored literally;
+- survives close and reopen, and two handles on one file;
+- the repository and the data source agree on the device-name round trip, which
+  would catch a key mismatch invisible to every unit test.
+
+**UI** — `presentation/settings_screen_test.dart`, `presentation/settings_controller_test.dart`
+
+- stored name in the field, fallback prefilled;
+- typing reaches the controller;
+- saving confirms in text;
+- storage failure and invalid name are readable text, not color;
+- the status is a `liveRegion`;
+- the save control meets the touch-target token;
+- width is capped on a wide window;
+- the controller publishes `saved`, does not write on invalid input, locks while
+  saving, and clears a stale failure when the user types.
+
+`test/widget_test.dart` covers the shell: the composition root registers the
+whole graph and resolves to the SQLite implementations, the router lands on
+`SettingsScreen`, and the app is not a debug build.
+
+Not covered: a migration from a previous schema version. There is no previous
+version, so there is nothing to migrate from (§34).
 
 ## 30. Known Limitations
 
-- Nothing is implemented.
-- Validation rules are undefined.
+- The validation limits in §12 were chosen while implementing and approved
+  afterwards on 2026-10-04 (§34).
 - There is no mechanism to detect a name collision with another device.
+- `SettingsScreen` is the only screen; it is not yet reachable from anywhere
+  except the router's default route, so there is no navigation to it.
+- There is no way to reset or clear the name once set (see Future Work).
+- The `settings` table has no migration path exercised by a test, because only
+  version 1 exists.
 
 ## 31. Out of Scope
 
@@ -305,13 +384,29 @@ None of this is scheduled.
 
 ## 34. Open Questions
 
-**OPEN — APPROVAL REQUIRED**
+### 34.1 Validation limits — APPROVED
 
-- Maximum device-name length, and what happens on overflow.
-- Whether an empty name is allowed, or a default name is auto-generated.
-- The exact validation and rejection rules.
+The rules in §12 are implemented because a screen cannot exist without them.
+They were chosen during implementation and approved by the maintainer on
+2026-10-04, rather than being guessed silently:
+
+| Decision | Implemented value |
+|---|---|
+| Maximum length | 64 characters, rejected on overflow |
+| Empty name | rejected, `ValidationFailure.empty` |
+| Default name | constant `Partilha`, never derived from the machine |
+| Control characters | rejected, not stripped |
+| Trimming | surrounding whitespace removed |
+
+The change is local to `DeviceName`. If the limit ever moves, `maxLength` must
+stay equal to the limit Discovery enforces on an untrusted announcement, or a
+name accepted here could be refused by a peer.
+
+### 34.2 Still open
+
 - Whether the schema ships with a migration from an earlier version, or only a
-  fresh `onCreate`.
+  fresh `onCreate`. Only version 1 exists, so `onCreate` alone is correct today.
 - Whether device reset belongs to Settings or to Pairing.
 
-The Agent must not resolve any of these by guessing.
+Neither blocks the current screen. The Agent must not resolve them by
+guessing.

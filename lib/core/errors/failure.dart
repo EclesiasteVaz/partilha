@@ -321,6 +321,14 @@ final class ValidationFailure extends Failure {
   @override
   final String userMessage;
 
+  /// A required field was left empty. Never retryable.
+  ///
+  /// Generic rather than a per-feature constant because "required but empty" is a
+  /// shape every form in the app shares, and a per-feature subclass cannot be
+  /// added here: this class is final by design, so the message belongs in the
+  /// shared vocabulary instead.
+  static const empty = _ValidationEmptyFailure();
+
   /// A field is longer than the contract allows. Never retryable.
   static const tooLong = _ValidationTooLongFailure();
 
@@ -333,6 +341,10 @@ final class ValidationFailure extends Failure {
   /// sanitising: silently rewriting a requested path hides an attempted
   /// traversal.
   static const unsafePath = _ValidationUnsafePathFailure();
+}
+
+final class _ValidationEmptyFailure extends ValidationFailure {
+  const _ValidationEmptyFailure() : super(userMessage: 'This is required.');
 }
 
 final class _ValidationTooLongFailure extends ValidationFailure {
