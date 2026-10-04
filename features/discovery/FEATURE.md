@@ -455,7 +455,28 @@ None is scheduled.
 No Discovery *feature* work — use cases, controllers, UI — may begin until the
 provider spike is complete on real hardware. The spike's own isolation and
 validation code is the only thing permitted before then, which is what this
-document currently describes.
+document previously described.
+
+### 34.0 This gate was relaxed by decision, on 2026-10-04
+
+The gate above is **no longer in force**. The maintainer decided to build the
+interface first and validate discovery on hardware afterwards, once the UI is
+complete. The rule was not satisfied and then waived; it was replaced.
+
+What this means honestly:
+
+- The provider is still **unvalidated on hardware**. The macOS evidence is one
+  machine, one network, and no second device.
+- The service type and TXT keys remain **provisional** (§7.2.1, §7.3.1 of
+  `docs/PROTOCOL.md`). Code written now must treat them as changeable.
+- Anything built against this provider may need rework once a real Android
+  device answers, or does not. That risk was accepted in exchange for being able
+  to see and use the interface.
+
+What it does **not** change: `docs/PROTOCOL.md` §7.2/§7.3 are still proposals,
+not approved protocol. Advertising a real receiver still requires the transport
+milestone, because `startAdvertising` needs a port that only a listening socket
+can supply.
 
 ## 34.1 Interface selection: decided
 
