@@ -1301,8 +1301,8 @@ counterpart of the table in `README.md`, and both must be updated together.
 
 | Platform | Folder | Status | Built / tested |
 |---|---|---|---|
-| Android | `android/` | Primary target, not implemented | APK builds; never run on a device |
-| macOS | `macos/` | Primary target, not implemented | No |
+| Android | `android/` | Primary target; Discovery gated on hardware | APK builds; never run on a device |
+| macOS | `macos/` | Primary target; Settings implemented | Debug build launched; mDNS spike run locally |
 | iOS | `ios/` | Scaffold only | No |
 | Windows | `windows/` | Scaffold only | No |
 | Linux | `linux/` | Scaffold only | No |
@@ -1311,7 +1311,9 @@ counterpart of the table in `README.md`, and both must be updated together.
 Definitions:
 
 ```text
-Primary target  →  approved scope (§41); planned, may be claimed as a goal
+Primary target  →  approved scope (§41); may be claimed as a goal. Whether a
+                   feature works there is stated in the table above, not implied
+                   by the platform being in scope
 Scaffold only   →  folder exists, contents are untouched `flutter create`
                    output, no feature or platform service was written
 Not supported   →  not built, not tested, no behaviour guaranteed
@@ -1332,6 +1334,17 @@ for a working platform. To keep that mistake detectable:
   test run (§64);
 - limitations are recorded in `features/<feature>/FEATURE.md`, never inferred
   from the existence of a folder.
+
+Current state, stated precisely: **Settings is the only implemented feature.** It
+runs on macOS — the debug build launches, renders the device-name screen, and
+creates its SQLite database under the app sandbox in
+`Documents/partilha.db` with `user_version = 1` and the `settings` key/value
+table. Discovery, pairing and transfer are unimplemented on every platform.
+
+mDNS has been validated on macOS on a single machine only: the local probes in
+`tool/spike/mdns_spike.dart` pass and `dns-sd` resolves the advertisement, but a
+second device is still required. `features/discovery/FEATURE.md` §34 gates the
+Discovery UI on the Android hardware run.
 
 ---
 
@@ -1709,19 +1722,40 @@ Accessibility requirements belong in feature `FEATURE.md` files as well.
 
 # 61. Routing
 
-Partilha uses:
+Partilha uses the Flutter SDK's own routing:
 
 ```text
-go_router
+MaterialApp.router
+    ↓
+AppRouterDelegate  +  AppRouteInformationParser
 ```
 
-Routing configuration belongs to the application/core routing layer.
+`go_router` was the previously documented choice. It was replaced by
+[`docs/decisions/0006-routing-api-nativa-do-flutter.md`](decisions/0006-routing-api-nativa-do-flutter.md),
+which records why, and what would have to change to reopen the decision.
 
-Feature screens may be exposed through explicit route configuration.
+Routing configuration belongs to `lib/core/routing/`, exposed through a barrel.
 
-Do not place routing decisions randomly inside widgets.
+```text
+AppRoute                     rota tipada, não uma string
+AppRouteInformationParser    URL ↔ AppRoute
+AppRouterDelegate            constrói a página a partir da rota
+CurrentRoute                 estado de navegação observado
+```
 
-Avoid navigation logic duplicated across multiple screens.
+The rules the structure exists to enforce:
+
+- routes are a closed `enum`, so an unknown or malformed route resolves to the
+  initial route instead of producing an arbitrary screen;
+- the delegate **resolves** screens from `InjectionContainer` rather than
+  building them, so a feature never learns that routing exists (§60);
+- navigation state belongs to the widget that hosts the delegate, which is why
+  `PartilhaApp` requires a `CurrentRoute`;
+- a route may be declared before it has a page (`AppRoute.send`), so the routing
+  shape matches the documented product without pretending the screen exists.
+
+Do not place routing decisions randomly inside widgets, and do not duplicate
+navigation logic across screens.
 
 ---
 

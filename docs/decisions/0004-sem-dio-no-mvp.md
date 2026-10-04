@@ -1,6 +1,7 @@
 # 0004 — Sem HTTP client (Dio) no MVP
 
-- **Estado:** Aceito
+- **Estado:** Aceito, excepto a menção a `go_router`, substituída pela
+  [0006](0006-routing-api-nativa-do-flutter.md)
 - **Data:** 2026-10-02
 - **Decide:** conjunto de dependências de rede
 
@@ -46,7 +47,7 @@ O conjunto de dependências do MVP fica:
 Flutter · Dart SDK
 GetIt
 freezed + json_serializable + build_runner
-go_router
+(routing: ver 0006 — a API nativa do Flutter substitui go_router)
 sqflite
 hugeicons
 mdns_dart        (pendente do spike da ADR 0002)

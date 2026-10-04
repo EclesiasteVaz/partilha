@@ -308,7 +308,9 @@ The exact structure may evolve as the application grows, but architectural bound
 - **ChangeNotifier** for application controllers
 - **freezed** for immutable models and states
 - **json_serializable** for JSON serialization
-- **go_router** for navigation
+- **`MaterialApp.router`** with the SDK's own `RouterDelegate` for navigation
+  ([ADR 0006](docs/decisions/0006-routing-api-nativa-do-flutter.md)) — no
+  routing package
 - **sqflite** for SQLite persistence
 
 ## Networking
@@ -906,8 +908,8 @@ works there.
 
 | Platform | Folder | Status | Built / tested |
 |---|---|---|---|
-| Android | `android/` | **Primary target** — not implemented yet | APK builds; never run on a device |
-| macOS | `macos/` | **Primary target** — not implemented yet | No |
+| Android | `android/` | **Primary target** — Discovery gated on hardware | APK builds; never run on a device |
+| macOS | `macos/` | **Primary target** — Settings runs | Debug build launched; mDNS spike run locally |
 | iOS | `ios/` | Scaffold only | No |
 | Windows | `windows/` | Scaffold only | No |
 | Linux | `linux/` | Scaffold only | No |
@@ -915,22 +917,32 @@ works there.
 
 Status vocabulary:
 
-- **Primary target** — inside the approved scope (`AGENTS.md` §41). Work is
-  planned and expected, but nothing is implemented yet.
+- **Primary target** — inside the approved scope (`AGENTS.md` §41). Whether any
+  feature actually works there is stated separately in the table above.
 - **Scaffold only** — the platform folder exists, its contents are untouched
   `flutter create` output, and no feature, permission or platform service has
   been written for it. These platforms are **not supported**: they are neither
   built nor tested, and no behaviour is guaranteed.
 
-Architectural readiness is not platform support. No feature is implemented on
-any platform at this point.
+Architectural readiness is not platform support.
 
-The first platform-specific behaviour now exists: the Android
+**Settings is the first implemented feature.** It runs on macOS: the debug build
+launches, renders the device-name screen, and creates its SQLite database at
+`~/Library/Containers/com.partilha.partilha/Data/Documents/partilha.db`. That is
+the whole of what works today — discovery, pairing and transfer remain
+unimplemented on every platform.
+
+Platform-specific behaviour exists for Android: the Android
 `WifiManager.MulticastLock`, isolated behind
 `core/platform/multicast_lock.dart`. An APK was built to confirm the Kotlin side
 compiles and that `CHANGE_WIFI_MULTICAST_STATE` reaches the manifest. **It has
 never been run on a physical device**, so Android remains unimplemented rather
-than supported.
+than supported. Discovery's `FEATURE.md` §34 checklist gates the Discovery UI on
+that hardware run.
+
+mDNS was validated on macOS only, and only on a single machine: the local probes
+pass and `dns-sd` resolves the advertisement, but a second device is still
+required before Discovery can be considered validated.
 
 Additional platforms may have different capabilities or platform-specific
 implementations. Platform-specific behavior should be isolated behind

@@ -21,6 +21,7 @@ Consequências         → custos, riscos, e trabalho que passa a existir
 | [0003](0003-token-fora-do-mdns.md) | O token nunca sai em metadados de descoberta | Aceito |
 | [0004](0004-sem-dio-no-mvp.md) | Sem HTTP client (Dio) no MVP | Aceito |
 | [0005](0005-estado-das-plataformas.md) | Manter o scaffolding das plataformas não-alvo e vigiar o estado | Aceito |
+| [0006](0006-routing-api-nativa-do-flutter.md) | Routing com a API nativa do Flutter, sem `go_router` | Aceito |
 
 ## Regra
 

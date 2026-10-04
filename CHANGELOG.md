@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Settings: device name** (`features/settings`): the first implemented screen.
+  A user-defined device name, validated as a `DeviceName` value object
+  (non-empty, at most 64 characters, no control characters), persisted through
+  `sqflite` behind a `SettingsLocalDataSource` / `SettingsRepository` boundary,
+  and bound to the UI with a `ChangeNotifier` controller over immutable Freezed
+  state. An unconfigured device uses the constant `Partilha` rather than a name
+  inferred from the machine, which would broadcast it to the local network.
+- **Routing** (`core/routing`): `MaterialApp.router` with a project-owned
+  `AppRoute` enum, `RouteInformationParser` and `AppRouterDelegate`, using the
+  SDK's own routing rather than a routing package. Settings is the first route;
+  `AppRoute.send` is declared but has no page yet. Recorded in
+  `docs/decisions/0006-routing-api-nativa-do-flutter.md`, which supersedes
+  `go_router` as the documented choice.
+- **`ValidationFailure`** for empty and overlong user input.
+
+### Changed
+
+- The app root no longer renders the "under construction" placeholder. It boots
+  into Settings and resolves its dependencies from `InjectionContainer`.
+
 - **Control message codec** (`core/protocol`): the trust boundary for the
   control channel, and the only place JSON is parsed. Frames are treated as
   untrusted input, so the decoder distinguishes three outcomes rather than
