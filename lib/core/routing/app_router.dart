@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:partilha/core/di/di.dart';
 import 'package:partilha/core/routing/app_route.dart';
+import 'package:partilha/features/discovery/presentation/discovery_screen.dart';
 import 'package:partilha/features/settings/presentation/settings_screen.dart';
 
 /// Turns [Uri]s into [AppRoute]s.
@@ -60,10 +61,16 @@ class AppRouterDelegate extends RouterDelegate<AppRoute>
           // Settings is resolved from the container rather than constructed
           // here: the screen owns a controller with state, and building it in
           // build() would throw that state away on every rebuild (§80, §81).
-          MaterialPage<void>(
-            key: const ValueKey<String>('settings'),
-            child: injectionContainer.resolve<SettingsScreen>(),
-          ),
+          if (_currentRoute.value == AppRoute.settings)
+            MaterialPage<void>(
+              key: const ValueKey<String>('settings'),
+              child: injectionContainer.resolve<SettingsScreen>(),
+            ),
+          if (_currentRoute.value == AppRoute.send)
+            MaterialPage<void>(
+              key: const ValueKey<String>('send'),
+              child: injectionContainer.resolve<DiscoveryScreen>(),
+            ),
         ],
         onDidRemovePage: (Page<Object?> page) {
           // There is nothing to pop: the app has one screen and the platform

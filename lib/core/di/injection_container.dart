@@ -1,6 +1,13 @@
+import 'dart:io';
 import 'package:get_it/get_it.dart';
 import 'package:partilha/core/logging/logging.dart';
 import 'package:partilha/core/network/network.dart';
+import 'package:partilha/core/platform/android_multicast_lock.dart';
+import 'package:partilha/core/platform/multicast_lock.dart';
+import 'package:partilha/features/discovery/application/application.dart';
+import 'package:partilha/features/discovery/data/data.dart';
+import 'package:partilha/features/discovery/domain/domain.dart';
+import 'package:partilha/features/discovery/presentation/presentation.dart';
 import 'package:partilha/features/settings/application/application.dart';
 import 'package:partilha/features/settings/data/data.dart';
 import 'package:partilha/features/settings/domain/domain.dart';
@@ -128,6 +135,29 @@ void configureDependencies({required AppLogger logger}) {
     ..registerFactory<SettingsScreen>(
       () => SettingsScreen(
         controller: injectionContainer.resolve<SettingsController>(),
+      ),
+    )
+    ..registerLazySingleton<MulticastLock>(MethodChannelMulticastLock.new)
+    ..registerLazySingleton<DiscoveryService>(
+      () => MdnsDiscoveryService(
+        hostName: Platform.localHostname,
+        multicastLock: injectionContainer.resolve<MulticastLock>(),
+      ),
+    )
+    ..registerFactory<DiscoverNearbyDevicesUseCase>(
+      () => DiscoverNearbyDevicesUseCase(
+        injectionContainer.resolve<DiscoveryService>(),
+      ),
+    )
+    ..registerFactory<DiscoveryController>(
+      () => DiscoveryController(
+        discoverNearbyDevices: injectionContainer
+            .resolve<DiscoverNearbyDevicesUseCase>(),
+      ),
+    )
+    ..registerFactory<DiscoveryScreen>(
+      () => DiscoveryScreen(
+        controller: injectionContainer.resolve<DiscoveryController>(),
       ),
     );
 }
