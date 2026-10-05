@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:partilha/core/routing/routing.dart';
 import 'package:partilha/core/theme/theme.dart';
 import 'package:partilha/features/settings/domain/domain.dart';
 import 'package:partilha/features/settings/presentation/settings_controller.dart';
@@ -149,6 +150,19 @@ class _DeviceNameSection extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Text('Save'),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.tonal(
+            onPressed: () async {
+              // Navigate to discovery/send route
+              await Router.of(
+                context,
+              ).routerDelegate.setNewRoutePath(AppRoute.send);
+            },
+            child: const Text('Send files'),
           ),
         ),
       ],
