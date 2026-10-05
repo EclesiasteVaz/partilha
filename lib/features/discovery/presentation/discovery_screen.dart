@@ -1,10 +1,12 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
+import 'package:partilha/core/di/di.dart';
 import 'package:partilha/core/errors/failure.dart';
+import 'package:partilha/core/routing/routing.dart';
 import 'package:partilha/core/theme/theme.dart';
 import 'package:partilha/features/discovery/domain/domain.dart';
 import 'package:partilha/features/discovery/presentation/discovery_controller.dart';
+import 'package:partilha/features/send/presentation/send_controller.dart';
 
 /// Finds nearby Partilha receivers.
 ///
@@ -78,6 +80,12 @@ class _Body extends StatelessWidget {
       DiscoveryStatus.devicesFound => _DeviceList(
         devices: state.devices,
         onRefresh: controller.search,
+        onDeviceSelected: (device) {
+          injectionContainer.resolve<SendController>().selectDevice(device);
+          unawaited(
+            Router.of(context).routerDelegate.setNewRoutePath(AppRoute.send),
+          );
+        },
       ),
     };
   }
@@ -212,10 +220,15 @@ class _Stopped extends StatelessWidget {
 }
 
 class _DeviceList extends StatelessWidget {
-  const _DeviceList({required this.devices, required this.onRefresh});
+  const _DeviceList({
+    required this.devices,
+    required this.onRefresh,
+    this.onDeviceSelected,
+  });
 
   final List<DiscoveredDevice> devices;
   final Future<void> Function() onRefresh;
+  final void Function(DiscoveredDevice device)? onDeviceSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -265,6 +278,9 @@ class _DeviceList extends StatelessWidget {
                   // into the transfer feature. The row is tappable in appearance
                   // only for now to keep the list usable on desktop.
                   trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    onDeviceSelected?.call(device);
+                  },
                 ),
               );
             },
