@@ -56,10 +56,30 @@ conteúdo num sítio diferente, e é assim que um placeholder se torna permanent
 delegate não sobreviva ao widget. É a razão de `PartilhaApp` exigir
 `currentRoute` em vez de o construir internamente.
 
-`AppRoute.send` está declarado sem página. Declarar a rota antes de a
-implementar é intencional: `docs/PROTOCOL.md` e `FEATURES.md` já a descrevem, e
-a UI de envio não pode ser construída enquanto o gate de hardware da Discovery
-(`features/discovery/FEATURE.md` §34) estiver por fechar.
+## Actualização — o fluxo de envio passou a ter três rotas
+
+Quando a ADR foi escrita, o projecto tinha uma rota. `AppRoute.send` estava
+declarado sem página, e o delegate construía um único `Page` que substituía o
+anterior conforme a rota mudava. Isso não é uma pilha, e o `popRoute` devolvia
+sempre `false`.
+
+O fluxo de envio tem três passos — Settings → Discovery → Transfer — e esse
+modelo não os suporta: o gesto de voltar do sistema fechava a aplicação a
+partir de qualquer ecrã que não fosse o primeiro, e não havia forma de desfazer
+uma navegação para a frente.
+
+`CurrentRoute` passou a manter uma pilha, o delegate constrói um `Page` por
+entrada, e `popRoute` desfaz uma entrada. `AppRoute.transfer` foi acrescentada
+para o passo de selecção de ficheiros, e `pushRoute` é a forma de avançar.
+
+A distinção que importa: **avançar empilha, um deep link substitui.** Uma URL
+ou um estado restaurado descreve o destino completo, portanto
+`setNewRoutePath` continua a substituir a pilha; mover-se para a frente a partir
+da UI empilha, para que Back revele o ecrã de onde o utilizador veio.
+
+Isto não é uma troca de solução de routing. `RouterDelegate`,
+`RouteInformationParser` e o enum continuam a ser os mesmos. É a mesma decisão,
+com a pilha que a UI precisa.
 
 ## Consequências
 
@@ -69,8 +89,14 @@ a UI de envio não pode ser construída enquanto o gate de hardware da Discovery
 - Não há `ShellRoute`, deep links tipados nem `redirect`. Se a navegação
   crescer para o ponto em que isso passe a custar mais do que poupar, a
   decisão deve ser reaberta com um ADR novo, não corrigida em silêncio.
-- `AppRoute.send` não tem página. Qualquer código que navegue para lá deve
-  esperar pela implementação do fluxo de envio.
+- `AppRoute.send` e `AppRoute.transfer` têm ambos página. Qualquer rota nova
+  precisa de um caso em `_pageFor`, e o enum é fechado para que uma rota sem
+  ecrã não compile.
+- `Router.of(context).routerDelegate` está tipado como
+  `RouterDelegate<Object?>`, portanto o `push` tipado deste projecto não é
+  alcançável através dele. O cast está confinado a `pushRoute`, que degrada para
+  `setNewRoutePath` se o delegate não for o nosso. É o custo de não usar um
+  pacote de routing, e é o motivo de a ADR 0006 continuar válida.
 
 ## Alternativas rejeitadas
 

@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:get_it/get_it.dart';
 import 'package:partilha/core/logging/logging.dart';
 import 'package:partilha/core/network/network.dart';
@@ -8,6 +9,10 @@ import 'package:partilha/features/discovery/application/application.dart';
 import 'package:partilha/features/discovery/data/data.dart';
 import 'package:partilha/features/discovery/domain/domain.dart';
 import 'package:partilha/features/discovery/presentation/presentation.dart';
+import 'package:partilha/features/file_transfer/application/application.dart';
+import 'package:partilha/features/file_transfer/data/data.dart';
+import 'package:partilha/features/file_transfer/domain/domain.dart';
+import 'package:partilha/features/file_transfer/presentation/presentation.dart';
 import 'package:partilha/features/settings/application/application.dart';
 import 'package:partilha/features/settings/data/data.dart';
 import 'package:partilha/features/settings/domain/domain.dart';
@@ -76,6 +81,26 @@ class InjectionContainer {
     String? instanceName,
   }) => _locator.registerFactory<T>(factoryFunc, instanceName: instanceName);
 
+  /// Replaces an existing registration, for tests.
+  ///
+  /// `get_it` refuses to register the same type twice, so a test that wants the
+  /// real graph but a fake provider — an mDNS service that does not touch the
+  /// network, a picker that never opens a dialog — had no way in and could only
+  /// avoid the real dependency by rebuilding the graph by hand.
+  ///
+  /// Lives on this wrapper rather than exposing `get_it` so the rest of the
+  /// codebase keeps a single seam to the package (`AGENTS.md` §17, §60.1).
+  void overrideLazySingleton<T extends Object>(T Function() factoryFunc) {
+    // `unregister` may run the existing instance's disposer, which is
+    // asynchronous. Overriding is a test concern and the replacement does not
+    // depend on the disposal having finished, so the future is deliberately not
+    // awaited: making this method async would force every caller to await a
+    // teardown detail it does not care about (AGENTS.md §81, §89).
+    final Object? pending = _locator.unregister<T>();
+    if (pending is Future<void>) pending.ignore();
+    registerLazySingleton<T>(factoryFunc);
+  }
+
   /// Disposes everything and clears the registry.
   ///
   /// Called on shutdown and between tests.
@@ -123,15 +148,20 @@ void configureDependencies({required AppLogger logger}) {
       ),
     )
     ..registerFactory<SaveDeviceNameUseCase>(SaveDeviceNameUseCase.new)
-    ..registerFactory<SettingsController>(
+    // A singleton, because the navigator keeps the Settings page alive on the
+    // stack while the send flow is pushed on top of it. A factory per resolution
+    // would rebuild the controller — and therefore the unsaved draft name — every
+    // time the user came back from discovery, which the real back stack now
+    // makes reachable (`AGENTS.md` §49, §80).
+    ..registerLazySingleton<SettingsController>(
       () => SettingsController(
         getDeviceName: injectionContainer.resolve<GetDeviceNameUseCase>(),
         saveDeviceName: injectionContainer.resolve<SaveDeviceNameUseCase>(),
       ),
     )
-    // The screen is a factory too, for the same reason as the controller: it is
-    // stateful, and a shared instance would keep one screen's text field alive
-    // after the screen is gone.
+    // The screen is a factory: it is a widget, and the navigator rebuilds it
+    // whenever the page list changes. All mutable state lives in the controller,
+    // so recreating the widget loses nothing.
     ..registerFactory<SettingsScreen>(
       () => SettingsScreen(
         controller: injectionContainer.resolve<SettingsController>(),
@@ -158,6 +188,29 @@ void configureDependencies({required AppLogger logger}) {
     ..registerFactory<DiscoveryScreen>(
       () => DiscoveryScreen(
         controller: injectionContainer.resolve<DiscoveryController>(),
+      ),
+    )
+    ..registerLazySingleton<FileSelectionService>(
+      () =>
+          PlatformFileSelectionService(injectionContainer.resolve<AppLogger>()),
+    )
+    ..registerFactory<SelectFilesUseCase>(
+      () => SelectFilesUseCase(
+        injectionContainer.resolve<FileSelectionService>(),
+      ),
+    )
+    // A singleton, unlike the other controllers, because it is the only holder
+    // of the destination and the selection: Discovery sets the destination and
+    // the Transfer screen reads it, so a factory per screen would lose the
+    // selection the moment the page rebuilt (§11, §80).
+    ..registerLazySingleton<TransferController>(
+      () => TransferController(
+        selectFiles: injectionContainer.resolve<SelectFilesUseCase>(),
+      ),
+    )
+    ..registerFactory<TransferScreen>(
+      () => TransferScreen(
+        controller: injectionContainer.resolve<TransferController>(),
       ),
     );
 }

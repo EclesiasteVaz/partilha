@@ -23,11 +23,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/decisions/0006-routing-api-nativa-do-flutter.md`, which supersedes
   `go_router` as the documented choice.
 - **`ValidationFailure`** for empty and overlong user input.
+- **Discovery: nearby device search UI** (`features/discovery`):
+  `DiscoveryController` over immutable Freezed state and a `DiscoveryScreen` that
+  renders scanning, found, empty, stopped and failed states. The search is
+  single-shot on demand — manual refresh, no polling and no timer — because a
+  stream would need a scan interval that nobody has approved.
+- **File selection** (`features/file_transfer`): the send flow's selection step,
+  end to end on Android and macOS. A project-owned `FileSelectionService`
+  contract, a `PlatformFileSelectionService` implementation over `file_picker`,
+  a `SelectFilesUseCase`, a `TransferController` with immutable Freezed state,
+  and a `TransferScreen` showing the destination, the selected files, per-file
+  removal and the running total. Multiple selection is supported and Send is
+  rendered disabled with an explanation, so the flow does not look finished when
+  it is not. The package choice is recorded in
+  `docs/decisions/0007-file-picker-para-escolha-de-ficheiros.md`: the official
+  `file_selector` was rejected because on Android it loads the whole file into
+  memory, which a large-file transfer app cannot do.
+- **`TransferDestination`**: the destination transfer acts on, projected from the
+  discovery entity. Untrusted advertised capabilities deliberately do not cross
+  the feature boundary.
+- **`InjectionContainer.overrideLazySingleton`**: a test seam for replacing one
+  registration in a real graph, which `get_it` otherwise refuses.
+- **macOS entitlements**: `com.apple.security.files.user-selected.read-only` in
+  both entitlements files, and `com.apple.security.network.server` in
+  `Release.entitlements`. Without the first, the file picker cannot read what
+  the user selected.
 
 ### Changed
 
 - The app root no longer renders the "under construction" placeholder. It boots
   into Settings and resolves its dependencies from `InjectionContainer`.
+- **Navigation is now a real stack.** `CurrentRoute` holds a stack, the delegate
+  builds one page per entry, and `popRoute` walks back through it. It previously
+  always returned `false` and rebuilt a single page, so the platform back
+  gesture closed the app from any screen but the first and Back could not undo a
+  forward navigation. Forward navigation pushes; a deep link still replaces the
+  stack.
+- **The send flow is owned by `file_transfer`.** A separate `send` feature had
+  been started for the destination-and-selection step; it duplicated
+  `DiscoveredDevice`, split one user flow across two features and was not in the
+  documented feature list, so it was dissolved into `features/file_transfer`.
+
+### Fixed
+
+- **Tapping a discovered device no longer throws.** The discovery screen resolved
+  the send-flow controller from the dependency container, but that controller was
+  never registered, so the one interaction the discovery screen exists for
+  crashed at runtime. No test covered it. The graph is now asserted in
+  `test/widget_test.dart` and the interaction is covered end to end in
+  `test/features/discovery/presentation/discovery_screen_test.dart`.
+- **Removing the last selected file no longer leaves the screen ready.** The
+  readiness flag was recomputed from the state before the removal was published,
+  so Send could stay reachable with an empty queue.
+- **Returning from the send flow no longer discards the device name draft.**
+  `SettingsController` was registered as a factory, so the first implementation
+  of a working back stack made an unsaved edit disappear as soon as the user came
+  back. It is now a `lazySingleton`.
 
 - **Control message codec** (`core/protocol`): the trust boundary for the
   control channel, and the only place JSON is parsed. Frames are treated as

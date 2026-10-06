@@ -36,6 +36,7 @@ dependencies:
   crypto: ^3.0.7
   cupertino_icons: ^1.0.8
 
+  file_picker: ^13.1.0
   flutter:
     sdk: flutter
   freezed_annotation: ^3.1.0

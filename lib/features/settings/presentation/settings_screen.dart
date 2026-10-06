@@ -156,12 +156,9 @@ class _DeviceNameSection extends StatelessWidget {
         Align(
           alignment: Alignment.centerLeft,
           child: FilledButton.tonal(
-            onPressed: () async {
-              // Navigate to discovery/send route
-              await Router.of(
-                context,
-              ).routerDelegate.setNewRoutePath(AppRoute.send);
-            },
+            // Pushed rather than replacing Settings, so Back returns to the
+            // device name the user may have just edited (`AGENTS.md` §49).
+            onPressed: () => pushRoute(context, AppRoute.send),
             child: const Text('Send files'),
           ),
         ),

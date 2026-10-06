@@ -36,7 +36,22 @@ Not supported in the MVP:
 
 ## 3. Current Status
 
-**NOT IMPLEMENTED.**
+**PARTIALLY IMPLEMENTED — file selection only. No bytes are transferred yet.**
+
+Implemented:
+
+- the file selection step, end to end on Android and macOS: contract
+  `FileSelectionService`, `PlatformFileSelectionService`, `SelectFilesUseCase`,
+  `TransferController` and `TransferScreen`;
+- the destination handoff from discovery, as `TransferDestination`;
+- multi-file selection, per-file removal and the running total.
+
+The Send action is rendered **disabled** with an explanation rather than hidden,
+so the flow does not appear finished when it is not.
+
+Not implemented: pairing, the queue, the sender, the receiver, streaming,
+progress during transfer, speed, retry, cancellation and filename conflicts. The
+transfer step is behind the same blockers listed below.
 
 Two previously blocking decisions are now approved:
 
@@ -236,6 +251,28 @@ WebSocketTransport → dart:io WebSocket
 dart:io File streams
 ```
 
+Implemented today, up to the point where the queue would start:
+
+```text
+TransferScreen (presentation)
+        ↓
+TransferController (presentation)
+        ↓
+SelectFilesUseCase (application)
+        ↓
+FileSelectionService (domain contract)
+        ↓
+PlatformFileSelectionService (data) → file_picker
+        ↓
+dart:io File streams (later, in the sender)
+```
+
+The destination arrives as `TransferDestination`, projected from the discovery
+entity by the discovery screen. The projection is deliberate: transfer must not
+depend on `capabilities`, which is untrusted advertised metadata
+(`features/discovery/FEATURE.md` §26). It keeps the dependency one-directional —
+discovery knows about transfer, transfer knows nothing about discovery.
+
 Separation required by `docs/PROTOCOL.md` §38:
 
 ```text
@@ -253,6 +290,21 @@ client.
 
 ## 17. Domain Contracts
 
+Implemented:
+
+```text
+TransferDestination
+    deviceId, deviceName, address, port
+
+SelectedFile
+    name, path, sizeInBytes (int? — null when the platform does not report it)
+
+FileSelectionService
+    Future<Result<List<SelectedFile>, Failure>> pickFiles()
+```
+
+Not yet implemented:
+
 ```text
 TransferRepository
     Stream<TransferProgress> send(TransferRequest request)
@@ -265,6 +317,10 @@ StorageValidationService
 ```
 
 Final contracts are fixed at implementation time and recorded here.
+
+`pickFiles` returns an **empty list when the user cancels**. Cancellation is an
+explicit choice, not an error, so the controller leaves the existing selection
+untouched rather than clearing it (`AGENTS.md` §28, §83).
 
 ## 18. Application Layer
 
@@ -285,25 +341,60 @@ socket and no filesystem handles.
 - explicit failure, retrying, cancelled and insufficient-storage rendering;
 - `ListenableBuilder` binding, controllers from GetIt.
 
+Implemented today:
+
+- `TransferController` with immutable Freezed `TransferState`, bound through
+  `ListenableBuilder`, resolved from GetIt;
+- `TransferScreen`: destination, file list with per-file removal, running total,
+  failure banner, and a disabled Send action with an explanation;
+- `TransferStatus` covers only `initial`, `selectingFiles`, `ready` and `error`,
+  because those are the only states that exist. `sending`, `completed` and
+  `cancelled` are not declared until there is behaviour behind them
+  (`AGENTS.md` §89).
+
+`TransferController` is a `lazySingleton`, unlike the other controllers in the
+app. It is the only holder of the destination and the selection: discovery sets
+the destination and the transfer screen reads it, so a factory per screen would
+drop the selection on every rebuild (`AGENTS.md` §11, §80).
+
+Accessibility: the failure banner is a live region, the per-file remove control
+names the file it removes, and the total is announced as bytes rather than read
+as a stray formatted string (§50).
+
 ## 21. External Dependencies
 
 ```text
 dart:io (File, WebSocket, HttpServer)
 getit
 freezed
+file_picker (file selection only)
 ```
 
-No file-transfer third-party package. No HTTP client
+No file-transfer third-party package — `file_picker` opens a dialog and returns
+paths; it does not move bytes. No HTTP client
 (`docs/decisions/0004-sem-dio-no-mvp.md`).
+
+`file_picker` is recorded in
+`docs/decisions/0007-file-picker-para-escolha-de-ficheiros.md`, including why
+the official `file_selector` was rejected: on Android it loads the whole file
+into memory, which this feature cannot do (§19, §21).
 
 ## 22. Package Isolation
 
 ```text
 dart:io WebSocket → WebSocketTransport
+file_picker       → FileSelectionService
 ```
 
 `dart:io` socket mechanics must not appear in domain, application, or
 presentation.
+
+`PlatformFileSelectionService` is the only file that imports `file_picker`.
+Presentation asks for a `FileSelectionService` and never sees
+`FilePicker` or `PlatformFile` (`AGENTS.md` §22, §51).
+
+`withData` must stay off. It makes the picker return file content as bytes,
+which on Android is the whole file in RAM (`AGENTS.md` §21).
 
 ## 23. Persistence
 
@@ -326,6 +417,36 @@ For transfers, the answer is no.
   paths;
 - file handles must be closed deterministically on every path, including
   cancellation.
+
+Resolved in this change:
+
+- **macOS**: `com.apple.security.files.user-selected.read-only` is now declared
+  in both `macos/Runner/DebugProfile.entitlements` and
+  `macos/Runner/Release.entitlements`, and
+  `com.apple.security.network.server` in `Release.entitlements`. Without the
+  first one the picker cannot read what the user selected.
+
+Outstanding, and **not** covered by this change:
+
+- **macOS**: `com.apple.security.network.client` is still absent from both
+  entitlements files. Discovery advertising and an outbound transfer will be
+  refused by the sandbox until it is added. It is deliberately not added here,
+  because it is not needed for file selection and §24 requires a platform
+  requirement to be registered with the change that introduces the behaviour that
+  needs it.
+
+Android file selection behaviour, inherited from the package and recorded in
+`docs/decisions/0007-file-picker-para-escolha-de-ficheiros.md`:
+
+- the plugin caches each selected file into `cacheDir/file_picker/` and returns
+  that path. Memory stays flat because the copy is streamed in 8 KiB blocks;
+- peak disk use during selection is roughly twice the size of the selection;
+- `clearTemporaryFiles()` exists and is the supported cleanup path. Nothing calls
+  it yet, because nothing owns a transfer that would clean up after itself — that
+  belongs with the queue and cancellation;
+- a cache copy that fails is dropped from the result with no error, so a
+  selection can be shorter than what the user picked and the data layer cannot
+  detect it.
 
 ## 25. Performance Requirements
 
@@ -416,12 +537,28 @@ Required:
 
 ## 30. Known Limitations
 
-- Not implemented.
+- **No bytes are transferred.** Only file selection is implemented (§3).
 - No pause/resume.
 - No folder transfer.
 - No transfer history — the user cannot review past transfers.
 - No background transfer: closing the app cancels the transfer.
 - Token-based authentication over a possibly plaintext transport.
+- **A file's size can be unknown.** The picker reports a size only for some
+  providers, and `SelectedFile.sizeInBytes` is therefore `int?`. The total is
+  `null` rather than a partial sum, and progress will have to be shown as
+  indeterminate until a total is known. It is never estimated (§20).
+- **Android duplicates the selection on disk.** The picker caches each selected
+  file before returning its path. Peak disk use during selection is roughly twice
+  the selection, and there is no progress indication for the copy — only
+  `picking`/`done` from the plugin.
+- **A failed cache copy silently drops a file on Android.** The plugin returns
+  `null` for it, so the returned list can be shorter than what the user picked
+  and this layer has no way to detect it. Surfacing it would require the
+  platform API to report how many files were asked for.
+- **Caches are not cleaned yet.** `clearTemporaryFiles()` is available but
+  nothing calls it, so the copies live until the OS reclaims the cache
+  directory. The cleanup belongs with the queue and cancellation, which own the
+  lifecycle of a transfer.
 
 ## 31. Out of Scope
 
@@ -453,6 +590,8 @@ None is scheduled.
 | 3 attempts, backoff `1s → 2s` | `FEATURES.md` §24 |
 | Queue is application-level, not transport-level | `docs/PROTOCOL.md` §38 |
 | No HTTP client in MVP | `docs/decisions/0004-sem-dio-no-mvp.md` |
+| `file_picker` for file selection, behind a project-owned contract | `docs/decisions/0007-file-picker-para-escolha-de-ficheiros.md` |
+| A separate `send` feature was rejected; the flow belongs to file_transfer | `FEATURES.md` §5, `AGENTS.md` §6 |
 
 ## 34. Open Questions
 

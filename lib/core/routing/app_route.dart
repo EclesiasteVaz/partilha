@@ -10,8 +10,11 @@ enum AppRoute {
   /// Device name and identity settings. The first real screen.
   settings('/'),
 
-  /// Where a user selects files to send. Not yet implemented.
-  send('/send');
+  /// Where a user picks the device to send to.
+  send('/send'),
+
+  /// Where a user reviews the destination and selects files.
+  transfer('/transfer');
 
   const AppRoute(this.location);
 
@@ -43,13 +46,42 @@ enum AppRoute {
 class CurrentRoute extends ValueNotifier<AppRoute> {
   CurrentRoute() : super(AppRoute.settings);
 
-  /// Moves to [route], or does nothing if it is already current.
+  final List<AppRoute> _stack = <AppRoute>[AppRoute.settings];
+
+  /// The routes below the current one, oldest first.
+  ///
+  /// Exposed read-only because the navigator needs to build a page per entry:
+  /// a single "current route" value cannot express that going back from Transfer
+  /// must reveal Discovery rather than replace it.
+  List<AppRoute> get stack => List<AppRoute>.unmodifiable(_stack);
+
+  /// Moves to [route], replacing the current entry.
   ///
   /// The equality check matters for the platform back gesture: a duplicate
   /// notification would re-push a route the user is already on, which reads as
   /// the screen sticking.
   void go(AppRoute route) {
     if (route == value) return;
+    _stack[_stack.length - 1] = route;
     value = route;
+  }
+
+  /// Pushes [route] on top of the current one.
+  void push(AppRoute route) {
+    if (route == value) return;
+    _stack.add(route);
+    value = route;
+  }
+
+  /// Removes the current route, revealing the one below it.
+  ///
+  /// Returns `false` at the root, which is the navigator's signal that there is
+  /// nothing left to pop and the platform should close the app instead
+  /// (`AGENTS.md` §83).
+  bool pop() {
+    if (_stack.length <= 1) return false;
+    _stack.removeLast();
+    value = _stack.last;
+    return true;
   }
 }

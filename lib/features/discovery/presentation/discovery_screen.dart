@@ -6,7 +6,8 @@ import 'package:partilha/core/routing/routing.dart';
 import 'package:partilha/core/theme/theme.dart';
 import 'package:partilha/features/discovery/domain/domain.dart';
 import 'package:partilha/features/discovery/presentation/discovery_controller.dart';
-import 'package:partilha/features/send/presentation/send_controller.dart';
+import 'package:partilha/features/file_transfer/domain/domain.dart';
+import 'package:partilha/features/file_transfer/presentation/presentation.dart';
 
 /// Finds nearby Partilha receivers.
 ///
@@ -80,11 +81,19 @@ class _Body extends StatelessWidget {
       DiscoveryStatus.devicesFound => _DeviceList(
         devices: state.devices,
         onRefresh: controller.search,
-        onDeviceSelected: (device) {
-          injectionContainer.resolve<SendController>().selectDevice(device);
-          unawaited(
-            Router.of(context).routerDelegate.setNewRoutePath(AppRoute.send),
+        onDeviceSelected: (DiscoveredDevice device) {
+          // Projected here, at the boundary, rather than handing the discovery
+          // entity over: transfer must not depend on untrusted advertised
+          // capabilities (`features/discovery/FEATURE.md` §26).
+          injectionContainer.resolve<TransferController>().setDestination(
+            TransferDestination(
+              deviceId: device.deviceId,
+              deviceName: device.deviceName,
+              address: device.address,
+              port: device.port,
+            ),
           );
+          pushRoute(context, AppRoute.transfer);
         },
       ),
     };
@@ -273,8 +282,7 @@ class _DeviceList extends StatelessWidget {
                     '${device.address}:${device.port}',
                     style: context.textStyles.bodySmall,
                   ),
-                  // Selection is out of scope for this commit: the Send flow
-                  // exists only as a route, and wiring device selection crosses
+                  // Tapping a row selects the destination and moves on. The
                   // into the transfer feature. The row is tappable in appearance
                   // only for now to keep the list usable on desktop.
                   trailing: const Icon(Icons.chevron_right),

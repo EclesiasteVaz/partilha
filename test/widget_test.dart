@@ -3,6 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:partilha/core/di/di.dart';
 import 'package:partilha/core/logging/logging.dart';
 import 'package:partilha/core/routing/routing.dart';
+import 'package:partilha/features/file_transfer/application/application.dart';
+import 'package:partilha/features/file_transfer/data/data.dart';
+import 'package:partilha/features/file_transfer/domain/domain.dart';
+import 'package:partilha/features/file_transfer/presentation/presentation.dart';
 import 'package:partilha/features/settings/application/application.dart';
 import 'package:partilha/features/settings/data/data.dart';
 import 'package:partilha/features/settings/domain/domain.dart';
@@ -31,6 +35,50 @@ void main() {
     expect(injectionContainer.isRegistered<SaveDeviceNameUseCase>(), isTrue);
     expect(injectionContainer.isRegistered<SettingsController>(), isTrue);
     expect(injectionContainer.isRegistered<SettingsScreen>(), isTrue);
+  });
+
+  test('configureDependencies registers the whole transfer graph', () {
+    // The send flow resolves the file picker and its controller from the graph.
+    // A missing registration here is a crash when a user taps a discovered
+    // device, which is exactly the bug this assertion was added for.
+    expect(injectionContainer.isRegistered<FileSelectionService>(), isTrue);
+    expect(injectionContainer.isRegistered<SelectFilesUseCase>(), isTrue);
+    expect(injectionContainer.isRegistered<TransferController>(), isTrue);
+    expect(injectionContainer.isRegistered<TransferScreen>(), isTrue);
+  });
+
+  test(
+    'the file selection service resolves to the platform implementation',
+    () {
+      expect(
+        injectionContainer.resolve<FileSelectionService>(),
+        isA<PlatformFileSelectionService>(),
+      );
+    },
+  );
+
+  test('the settings controller is a singleton, so a draft survives', () {
+    // Back from the send flow returns to a Settings page that is still on the
+    // stack. A factory would rebuild the controller and drop the unsaved name.
+    expect(
+      identical(
+        injectionContainer.resolve<SettingsController>(),
+        injectionContainer.resolve<SettingsController>(),
+      ),
+      isTrue,
+    );
+  });
+
+  test('the transfer controller is a singleton, so the selection survives', () {
+    // Discovery sets the destination and the Transfer screen reads it. A factory
+    // per screen would drop the selection on every rebuild (AGENTS.md §11).
+    expect(
+      identical(
+        injectionContainer.resolve<TransferController>(),
+        injectionContainer.resolve<TransferController>(),
+      ),
+      isTrue,
+    );
   });
 
   test('the repositories resolve to the SQLite implementations', () {
