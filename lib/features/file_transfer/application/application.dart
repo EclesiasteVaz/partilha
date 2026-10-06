@@ -2,3 +2,4 @@
 library;
 
 export 'select_files_use_case.dart';
+export 'send_file_use_case.dart';
