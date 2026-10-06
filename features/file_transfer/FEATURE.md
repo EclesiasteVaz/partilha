@@ -49,8 +49,7 @@ Implemented:
 The Send action is rendered **disabled** with an explanation rather than hidden,
 so the flow does not appear finished when it is not.
 
-Not implemented: pairing, the queue, the sender, the receiver, streaming,
-progress during transfer, speed, retry, cancellation and filename conflicts. The
+Partially implemented: receiver scaffolding exists (TransferServer contract + DartIoTransferServer placeholder) enforcing framing surface (text/binary discrimination, 64 KiB guard). Not implemented: pairing, queue, sender, full receiver (parsing control, writing files, storage validation), streaming/progress/speed/retry/cancellation/filename conflicts. The
 transfer step is behind the same blockers listed below.
 
 Two previously blocking decisions are now approved:

@@ -4,3 +4,4 @@ library;
 export 'file_selection_service.dart';
 export 'selected_file.dart';
 export 'transfer_destination.dart';
+export 'transfer_server.dart';
