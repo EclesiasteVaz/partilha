@@ -48,8 +48,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   both entitlements files, and `com.apple.security.network.server` in
   `Release.entitlements`. Without the first, the file picker cannot read what
   the user selected.
+- **File transfer state machine** (`features/file_transfer`): `TransferStatus`
+  and the immutable `TransferItem` implement the per-transfer lifecycle of
+  `FEATURES.md` §18 / `features/file_transfer/FEATURE.md` §8 and §9, including
+  terminal-state enforcement and the rule that only a transition to `failed`
+  may carry a failure. `TransferRequest` now carries the destination and the
+  selected file, and `FileTransferProgress` is the repository's byte-level
+  progress report.
+- **Transfer queue** (`features/file_transfer`): `TransferQueue` runs one file
+  at a time in selection order, records byte-accurate progress, retries within
+  3 attempts with the approved `1s → 2s` backoff driven by
+  `Failure.isRetryable`, treats a stream that closes before the declared size
+  as a dropped connection rather than a completed file, and cancels queued,
+  active and backing-off transfers. Exposed through `QueueTransfersUseCase` —
+  where an empty selection is a `ValidationFailure`, not a silent success — and
+  `CancelTransferUseCase`, both registered in the dependency graph. The queue
+  is not called from the UI yet: Send stays disabled until pairing exists.
 
 ### Changed
+
+- **The screen's status enum is now `TransferSetupStatus`.** It was named
+  `TransferStatus`, which now belongs to the domain's per-transfer lifecycle;
+  one name must not mean two things. For the same reason
+  `transfer_type.dart` became `transfer_request.dart`.
 
 - The app root no longer renders the "under construction" placeholder. It boots
   into Settings and resolves its dependencies from `InjectionContainer`.

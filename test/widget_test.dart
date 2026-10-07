@@ -43,8 +43,32 @@ void main() {
     // device, which is exactly the bug this assertion was added for.
     expect(injectionContainer.isRegistered<FileSelectionService>(), isTrue);
     expect(injectionContainer.isRegistered<SelectFilesUseCase>(), isTrue);
+    expect(injectionContainer.isRegistered<TransferRepository>(), isTrue);
+    expect(injectionContainer.isRegistered<SendFileUseCase>(), isTrue);
+    expect(injectionContainer.isRegistered<TransferQueue>(), isTrue);
+    expect(injectionContainer.isRegistered<QueueTransfersUseCase>(), isTrue);
+    expect(injectionContainer.isRegistered<CancelTransferUseCase>(), isTrue);
     expect(injectionContainer.isRegistered<TransferController>(), isTrue);
     expect(injectionContainer.isRegistered<TransferScreen>(), isTrue);
+  });
+
+  test('the transfer repository resolves to the WebSocket implementation', () {
+    expect(
+      injectionContainer.resolve<TransferRepository>(),
+      isA<WebSocketTransferRepository>(),
+    );
+  });
+
+  test('the transfer queue is a singleton, so items outlive a screen', () {
+    // Items are application state: a screen rebuild must not hand the next
+    // listener an empty queue (AGENTS.md §11, §81).
+    expect(
+      identical(
+        injectionContainer.resolve<TransferQueue>(),
+        injectionContainer.resolve<TransferQueue>(),
+      ),
+      isTrue,
+    );
   });
 
   test(

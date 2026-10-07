@@ -10,11 +10,13 @@ part 'transfer_controller.freezed.dart';
 /// What the transfer setup screen is doing.
 ///
 /// Only the states that exist today: the destination, the selection, and the
-/// two ways picking can end. `sending`, `completed` and `cancelled` are absent
-/// because no transfer runs yet, and declaring them would be state without
-/// behaviour (`AGENTS.md` §89). `features/file_transfer/FEATURE.md` §8 lists the
-/// full set the finished feature needs.
-enum TransferStatus {
+/// two ways picking can end. This is the screen's own status, deliberately not
+/// the per-transfer `TransferStatus` of `features/file_transfer/domain`: one
+/// drives a button, the other is a queue item's lifecycle (`AGENTS.md` §56).
+/// `sending`, `completed` and `cancelled` are absent because no transfer runs
+/// from this screen yet, and declaring them would be state without behaviour
+/// (`AGENTS.md` §89).
+enum TransferSetupStatus {
   /// Nothing chosen yet.
   initial,
 
@@ -36,7 +38,7 @@ enum TransferStatus {
 @freezed
 sealed class TransferState with _$TransferState {
   const factory TransferState({
-    @Default(TransferStatus.initial) TransferStatus status,
+    @Default(TransferSetupStatus.initial) TransferSetupStatus status,
     TransferDestination? destination,
     @Default(<SelectedFile>[]) List<SelectedFile> files,
     Failure? error,
@@ -46,8 +48,9 @@ sealed class TransferState with _$TransferState {
 /// Holds the destination and the files the user chose.
 ///
 /// Owns no file handle and no socket: it is the presentation state for one
-/// attempt, and the queue that will eventually consume it does not exist yet
-/// (`features/file_transfer/FEATURE.md` §3). Presenting a picker is the only
+/// attempt, and nothing hands this selection to the queue yet — Send is still
+/// disabled because the send path needs pairing (`features/file_transfer/FEATURE.md`
+/// §3). Presenting a picker is the only
 /// asynchronous work, and a picker cannot be cancelled programmatically, so
 /// there is no in-flight request to invalidate on dispose — the opposite of the
 /// discovery controller, which has a stream result that can arrive late
@@ -96,7 +99,9 @@ class TransferController extends ChangeNotifier {
   /// empty selection would silently discard files the user had already picked,
   /// which contradicts their intent (`AGENTS.md` §28).
   Future<void> pickFiles() async {
-    _emit(_state.copyWith(status: TransferStatus.selectingFiles, error: null));
+    _emit(
+      _state.copyWith(status: TransferSetupStatus.selectingFiles, error: null),
+    );
 
     final Result<List<SelectedFile>, Failure> result = await _selectFiles();
 
@@ -108,13 +113,13 @@ class TransferController extends ChangeNotifier {
         }
         _emit(
           _state.copyWith(
-            status: TransferStatus.ready,
+            status: TransferSetupStatus.ready,
             files: value,
             error: null,
           ),
         );
       case Err(:final error):
-        _emit(_state.copyWith(status: TransferStatus.error, error: error));
+        _emit(_state.copyWith(status: TransferSetupStatus.error, error: error));
     }
   }
 
@@ -136,8 +141,8 @@ class TransferController extends ChangeNotifier {
 
   /// Ready only when there is something to send, so the send action can never be
   /// enabled with an empty queue.
-  static TransferStatus _statusFor(List<SelectedFile> files) =>
-      files.isEmpty ? TransferStatus.initial : TransferStatus.ready;
+  static TransferSetupStatus _statusFor(List<SelectedFile> files) =>
+      files.isEmpty ? TransferSetupStatus.initial : TransferSetupStatus.ready;
 
   void _emit(TransferState next) {
     _state = next;

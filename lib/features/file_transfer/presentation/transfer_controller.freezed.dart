@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$TransferState implements DiagnosticableTreeMixin {
 
- TransferStatus get status; TransferDestination? get destination; List<SelectedFile> get files; Failure? get error;
+ TransferSetupStatus get status; TransferDestination? get destination; List<SelectedFile> get files; Failure? get error;
 /// Create a copy of TransferState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -51,7 +51,7 @@ abstract mixin class $TransferStateCopyWith<$Res>  {
   factory $TransferStateCopyWith(TransferState value, $Res Function(TransferState) _then) = _$TransferStateCopyWithImpl;
 @useResult
 $Res call({
- TransferStatus status, TransferDestination? destination, List<SelectedFile> files, Failure? error
+ TransferSetupStatus status, TransferDestination? destination, List<SelectedFile> files, Failure? error
 });
 
 
@@ -71,7 +71,7 @@ class _$TransferStateCopyWithImpl<$Res>
 @pragma('vm:prefer-inline') @override $Res call({Object? status = null,Object? destination = freezed,Object? files = null,Object? error = freezed,}) {
   return _then(_self.copyWith(
 status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
-as TransferStatus,destination: freezed == destination ? _self.destination : destination // ignore: cast_nullable_to_non_nullable
+as TransferSetupStatus,destination: freezed == destination ? _self.destination : destination // ignore: cast_nullable_to_non_nullable
 as TransferDestination?,files: null == files ? _self.files : files // ignore: cast_nullable_to_non_nullable
 as List<SelectedFile>,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
 as Failure?,
@@ -156,7 +156,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( TransferStatus status,  TransferDestination? destination,  List<SelectedFile> files,  Failure? error)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( TransferSetupStatus status,  TransferDestination? destination,  List<SelectedFile> files,  Failure? error)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _TransferState() when $default != null:
 return $default(_that.status,_that.destination,_that.files,_that.error);case _:
@@ -177,7 +177,7 @@ return $default(_that.status,_that.destination,_that.files,_that.error);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( TransferStatus status,  TransferDestination? destination,  List<SelectedFile> files,  Failure? error)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( TransferSetupStatus status,  TransferDestination? destination,  List<SelectedFile> files,  Failure? error)  $default,) {final _that = this;
 switch (_that) {
 case _TransferState():
 return $default(_that.status,_that.destination,_that.files,_that.error);}
@@ -194,7 +194,7 @@ return $default(_that.status,_that.destination,_that.files,_that.error);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( TransferStatus status,  TransferDestination? destination,  List<SelectedFile> files,  Failure? error)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( TransferSetupStatus status,  TransferDestination? destination,  List<SelectedFile> files,  Failure? error)?  $default,) {final _that = this;
 switch (_that) {
 case _TransferState() when $default != null:
 return $default(_that.status,_that.destination,_that.files,_that.error);case _:
@@ -209,10 +209,10 @@ return $default(_that.status,_that.destination,_that.files,_that.error);case _:
 
 
 class _TransferState with DiagnosticableTreeMixin implements TransferState {
-  const _TransferState({this.status = TransferStatus.initial, this.destination, final  List<SelectedFile> files = const <SelectedFile>[], this.error}): _files = files;
+  const _TransferState({this.status = TransferSetupStatus.initial, this.destination, final  List<SelectedFile> files = const <SelectedFile>[], this.error}): _files = files;
   
 
-@override@JsonKey() final  TransferStatus status;
+@override@JsonKey() final  TransferSetupStatus status;
 @override final  TransferDestination? destination;
  final  List<SelectedFile> _files;
 @override@JsonKey() List<SelectedFile> get files {
@@ -259,7 +259,7 @@ abstract mixin class _$TransferStateCopyWith<$Res> implements $TransferStateCopy
   factory _$TransferStateCopyWith(_TransferState value, $Res Function(_TransferState) _then) = __$TransferStateCopyWithImpl;
 @override @useResult
 $Res call({
- TransferStatus status, TransferDestination? destination, List<SelectedFile> files, Failure? error
+ TransferSetupStatus status, TransferDestination? destination, List<SelectedFile> files, Failure? error
 });
 
 
@@ -279,7 +279,7 @@ class __$TransferStateCopyWithImpl<$Res>
 @override @pragma('vm:prefer-inline') $Res call({Object? status = null,Object? destination = freezed,Object? files = null,Object? error = freezed,}) {
   return _then(_TransferState(
 status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
-as TransferStatus,destination: freezed == destination ? _self.destination : destination // ignore: cast_nullable_to_non_nullable
+as TransferSetupStatus,destination: freezed == destination ? _self.destination : destination // ignore: cast_nullable_to_non_nullable
 as TransferDestination?,files: null == files ? _self._files : files // ignore: cast_nullable_to_non_nullable
 as List<SelectedFile>,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
 as Failure?,

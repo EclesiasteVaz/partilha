@@ -199,6 +199,30 @@ void configureDependencies({required AppLogger logger}) {
         injectionContainer.resolve<FileSelectionService>(),
       ),
     )
+    // A factory, so a caller resolves its own repository instead of sharing
+    // one. The queue captures a single instance when it is first built, which
+    // is correct only while the repository keeps no state between `send` calls
+    // — the constraint the real implementation must keep (§81).
+    ..registerFactory<TransferRepository>(WebSocketTransferRepository.new)
+    ..registerFactory<SendFileUseCase>(
+      () => SendFileUseCase(injectionContainer.resolve<TransferRepository>()),
+    )
+    // A lazy singleton because it owns the queue: items outlive any one screen,
+    // and a factory would hand every resolution a fresh, empty queue
+    // (`AGENTS.md` §11, §81). Nothing sends yet — the Send action stays
+    // disabled until pairing exists (`features/file_transfer/FEATURE.md` §3).
+    ..registerLazySingleton<TransferQueue>(
+      () => TransferQueue(
+        send: injectionContainer.resolve<SendFileUseCase>(),
+        logger: injectionContainer.resolve<AppLogger>(),
+      ),
+    )
+    ..registerFactory<QueueTransfersUseCase>(
+      () => QueueTransfersUseCase(injectionContainer.resolve<TransferQueue>()),
+    )
+    ..registerFactory<CancelTransferUseCase>(
+      () => CancelTransferUseCase(injectionContainer.resolve<TransferQueue>()),
+    )
     // A singleton, unlike the other controllers, because it is the only holder
     // of the destination and the selection: Discovery sets the destination and
     // the Transfer screen reads it, so a factory per screen would lose the

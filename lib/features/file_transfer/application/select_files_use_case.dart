@@ -6,9 +6,8 @@ import 'package:partilha/features/file_transfer/domain/domain.dart';
 ///
 /// Exists so the controller depends on an application action rather than on the
 /// picker package behind [FileSelectionService] (`AGENTS.md` §12). It adds no
-/// orchestration: the queue is not implemented yet, so there is nothing to
-/// coordinate, and inventing coordination now would be policy nobody approved
-/// (`features/file_transfer/FEATURE.md` §34).
+/// orchestration: picking files is not queued work — the queue takes over once
+/// the selection exists (`features/file_transfer/FEATURE.md` §16).
 class SelectFilesUseCase {
   const SelectFilesUseCase(this._fileSelection);
 

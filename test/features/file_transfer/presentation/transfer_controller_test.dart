@@ -28,7 +28,7 @@ void main() {
   });
 
   test('starts empty, before anything has been chosen', () {
-    expect(controller.state.status, TransferStatus.initial);
+    expect(controller.state.status, TransferSetupStatus.initial);
     expect(controller.state.destination, isNull);
     expect(controller.state.files, isEmpty);
     expect(controller.totalBytes, 0);
@@ -55,22 +55,22 @@ void main() {
 
       // Readiness depends on having files, not on naming a device; letting this
       // flip to `ready` would enable Send with an empty queue.
-      expect(controller.state.status, TransferStatus.initial);
+      expect(controller.state.status, TransferSetupStatus.initial);
     });
   });
 
   group('pickFiles', () {
     test('publishes selectingFiles while the picker is open', () async {
-      TransferStatus? seenDuringPick;
+      TransferSetupStatus? seenDuringPick;
       controller.addListener(() {
-        if (controller.state.status == TransferStatus.selectingFiles) {
+        if (controller.state.status == TransferSetupStatus.selectingFiles) {
           seenDuringPick = controller.state.status;
         }
       });
 
       await controller.pickFiles();
 
-      expect(seenDuringPick, TransferStatus.selectingFiles);
+      expect(seenDuringPick, TransferSetupStatus.selectingFiles);
     });
 
     test('adopts the selection and becomes ready', () async {
@@ -80,7 +80,7 @@ void main() {
 
       await controller.pickFiles();
 
-      expect(controller.state.status, TransferStatus.ready);
+      expect(controller.state.status, TransferSetupStatus.ready);
       expect(controller.state.files, twoFiles);
     });
 
@@ -123,7 +123,7 @@ void main() {
       // Treating a cancel as "empty selection" would silently discard files the
       // user had already chosen, which contradicts their intent (§28).
       expect(controller.state.files, twoFiles);
-      expect(controller.state.status, TransferStatus.ready);
+      expect(controller.state.status, TransferSetupStatus.ready);
     });
 
     test('a failure surfaces the failure and keeps the selection', () async {
@@ -137,7 +137,7 @@ void main() {
       );
       await controller.pickFiles();
 
-      expect(controller.state.status, TransferStatus.error);
+      expect(controller.state.status, TransferSetupStatus.error);
       expect(controller.state.error, isNotNull);
       expect(
         controller.state.error!.userMessage,
@@ -194,7 +194,7 @@ void main() {
         ..removeFile(twoFiles.last);
 
       // Send must never be reachable with an empty queue.
-      expect(controller.state.status, TransferStatus.initial);
+      expect(controller.state.status, TransferSetupStatus.initial);
       expect(controller.state.files, isEmpty);
     });
   });

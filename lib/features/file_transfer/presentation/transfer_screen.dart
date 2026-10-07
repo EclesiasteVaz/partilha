@@ -94,7 +94,7 @@ class _Body extends StatelessWidget {
           Expanded(
             child: state.files.isEmpty
                 ? _EmptySelection(
-                    isOpen: state.status == TransferStatus.selectingFiles,
+                    isOpen: state.status == TransferSetupStatus.selectingFiles,
                   )
                 : _FileList(
                     files: state.files,

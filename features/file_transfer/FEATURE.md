@@ -36,7 +36,7 @@ Not supported in the MVP:
 
 ## 3. Current Status
 
-**PARTIALLY IMPLEMENTED — file selection only. No bytes are transferred yet.**
+**PARTIALLY IMPLEMENTED — selection and the local queue. No bytes are transferred yet.**
 
 Implemented:
 
@@ -44,12 +44,27 @@ Implemented:
   `FileSelectionService`, `PlatformFileSelectionService`, `SelectFilesUseCase`,
   `TransferController` and `TransferScreen`;
 - the destination handoff from discovery, as `TransferDestination`;
-- multi-file selection, per-file removal and the running total.
+- multi-file selection, per-file removal and the running total;
+- the per-transfer state machine: `TransferStatus` and `TransferItem` enforce
+  §8 and §9, including terminal-state enforcement and the rule that only a
+  transition to `failed` may carry a failure;
+- the application-level queue: `TransferQueue` runs one file at a time in
+  selection order, records byte-accurate progress, retries within 3 attempts
+  with the approved `1s → 2s` backoff, and cancels queued, active and
+  backing-off transfers. Exposed through `QueueTransfersUseCase` and
+  `CancelTransferUseCase`, registered in the dependency graph.
 
 The Send action is rendered **disabled** with an explanation rather than hidden,
-so the flow does not appear finished when it is not.
+so the flow does not appear finished when it is not. The queue is therefore
+built and tested but not reachable from the UI yet: a send needs the pairing
+context, which does not exist (§34).
 
-Partially implemented: receiver scaffolding exists (TransferServer contract + DartIoTransferServer placeholder) enforcing framing surface (text/binary discrimination, 64 KiB guard). Not implemented: pairing, queue, sender, full receiver (parsing control, writing files, storage validation), streaming/progress/speed/retry/cancellation/filename conflicts. The
+Partially implemented: receiver scaffolding exists (TransferServer contract +
+DartIoTransferServer placeholder) enforcing the framing surface (text/binary
+discrimination, 64 KiB guard), and `WebSocketTransferRepository` is a placeholder
+that reports no bytes. Not implemented: pairing, the sender over the transport,
+the full receiver (control parsing, writing files, storage validation in the
+flow), live speed, filename conflicts, and the controller → queue wiring. The
 transfer step is behind the same blockers listed below.
 
 Two previously blocking decisions are now approved:
@@ -158,6 +173,20 @@ Terminal states: `completed`, `failed`, `cancelled`.
 
 `completed`, `failed` and `cancelled` must not have outgoing transitions.
 
+Enforced by `TransferItem.canTransitionTo` / `TransferItem.transitionTo`
+(`lib/features/file_transfer/domain/transfer_item.dart`), and covered by an
+exhaustive test over every state pair, so an edit to the machine cannot drift
+from this table. A transition into `failed` must carry a failure; no other
+transition may carry one. The queue is the only code that transitions items
+(§18), and a refused transition is a no-op rather than an error, because a
+race — the user cancelling while a send completes — is normal use (§15, §83 of
+`AGENTS.md`).
+
+The queue enqueues items as `queued`, not `created`: the only transition out of
+`created` is `validating`, and validation is receiver-side (§12) and unreachable
+until the control protocol exists (§34). Creating an item in the state it
+actually is avoids a transition that performs nothing.
+
 ## 10. Inputs
 
 - a set of selected files with paths and sizes;
@@ -250,21 +279,33 @@ WebSocketTransport → dart:io WebSocket
 dart:io File streams
 ```
 
-Implemented today, up to the point where the queue would start:
+Implemented today:
 
 ```text
 TransferScreen (presentation)
         ↓
-TransferController (presentation)
+TransferController (presentation)     ← selection only; Send is disabled
         ↓
 SelectFilesUseCase (application)
         ↓
 FileSelectionService (domain contract)
         ↓
 PlatformFileSelectionService (data) → file_picker
+
+
+TransferQueue (application)           ← order, retry, cancel, progress
         ↓
-dart:io File streams (later, in the sender)
+SendFileUseCase (application)
+        ↓
+TransferRepository (domain contract)
+        ↓
+WebSocketTransferRepository (data)    ← placeholder: reports no bytes
 ```
+
+`QueueTransfersUseCase` and `CancelTransferUseCase` sit between the controller
+and the queue, and all of it is registered in the dependency graph. What is
+missing is the last link: the controller does not call the queue yet, because a
+send needs the pairing context and the handshake, both still open (§34).
 
 The destination arrives as `TransferDestination`, projected from the discovery
 entity by the discovery screen. The projection is deliberate: transfer must not
@@ -300,19 +341,43 @@ SelectedFile
 
 FileSelectionService
     Future<Result<List<SelectedFile>, Failure>> pickFiles()
+
+TransferRequest
+    id, destination, file, type — one unit of send work
+
+TransferStatus / TransferItem
+    the per-transfer state machine (§8, §9), immutable, with byte progress
+
+TransferRepository
+    Stream<FileTransferProgress> send(TransferRequest request)
+
+FileTransferProgress
+    transferId, bytesTransferred, totalBytes
+
+QueueTransfersUseCase
+    Future<Result<void, Failure>> call({destination, files})
+    — empty selection is a ValidationFailure, not a silent success
+
+CancelTransferUseCase
+    void call(String transferId)
+    — idempotent; unknown or already-terminal ids are no-ops
+
+StorageValidationService
+    Future<Result<StorageStatus, Failure>> check(...)
 ```
+
+`TransferRequest.id` is a local queue identifier, not a wire identifier: the
+transfer id format is open (§34).
+
+`StorageValidationService` has a `DartIoStorageValidationService` placeholder,
+but is not called from the send path yet — storage validation is receiver-side
+(§12) and depends on the control protocol.
 
 Not yet implemented:
 
 ```text
-TransferRepository
-    Stream<TransferProgress> send(TransferRequest request)
-
-CancelTransferUseCase
-    Future<Result<void, Failure>> call(TransferId id)
-
-StorageValidationService
-    Future<Result<StorageStatus, Failure>> check(...)
+the sender over WebSocketTransport
+the receiver control layer (parsing, writing files, filename conflicts)
 ```
 
 Final contracts are fixed at implementation time and recorded here.
@@ -325,6 +390,31 @@ untouched rather than clearing it (`AGENTS.md` §28, §83).
 
 Owns the queue, retry policy, cancellation, and progress aggregation. Owns no
 socket and no filesystem handles.
+
+Implemented as `TransferQueue`:
+
+- **order**: one file at a time, in selection order; the next file starts only
+  when the previous one is terminal (`FEATURES.md` §23 — a failed file is
+  marked and the queue moves on);
+- **state ownership**: the queue is the only code that transitions a
+  `TransferItem` (§9), and it publishes an immutable snapshot of the whole
+  queue after every change;
+- **progress**: taken from the repository's real byte counts, never estimated
+  (§20 of `AGENTS.md`); an item whose size is unknown keeps a `null` total;
+- **retry**: up to 3 attempts per file, backoff `1s → 2s`, driven by
+  `Failure.isRetryable` rather than by catching every exception — a
+  non-retryable failure fails the file at once and the queue continues;
+- **early close is a failure**: a stream that ends before the declared size is
+  `TransferFailure.connectionLost`, not a completed file (§7, §14);
+- **cancellation**: reachable from `queued`, `starting`, `transferring` and
+  `retrying`; it releases the active subscription, wins over a backoff that is
+  already running, and is a no-op for unknown or terminal ids (§15).
+
+The retry delay is injectable so tests assert the approved backoff without
+spending three real seconds.
+
+Not yet implemented here: speed calculation, storage validation before a send
+(receiver-side, §12), and the controller → queue wiring (§3).
 
 ## 19. Data Layer
 
@@ -346,10 +436,12 @@ Implemented today:
   `ListenableBuilder`, resolved from GetIt;
 - `TransferScreen`: destination, file list with per-file removal, running total,
   failure banner, and a disabled Send action with an explanation;
-- `TransferStatus` covers only `initial`, `selectingFiles`, `ready` and `error`,
-  because those are the only states that exist. `sending`, `completed` and
-  `cancelled` are not declared until there is behaviour behind them
-  (`AGENTS.md` §89).
+- `TransferSetupStatus` covers only `initial`, `selectingFiles`, `ready` and
+  `error`, because those are the only states that exist. `sending`, `completed`
+  and `cancelled` are not declared until there is behaviour behind them
+  (`AGENTS.md` §89). The name is deliberately `TransferSetupStatus`, not
+  `TransferStatus`: the per-transfer lifecycle of §8 is owned by the domain
+  (`TransferStatus`), and one name must not mean two things.
 
 `TransferController` is a `lazySingleton`, unlike the other controllers in the
 app. It is the only holder of the destination and the selection: discovery sets
@@ -536,7 +628,16 @@ Required:
 
 ## 30. Known Limitations
 
-- **No bytes are transferred.** Only file selection is implemented (§3).
+- **No bytes are transferred.** Selection and the local queue are implemented
+  (§3), but `WebSocketTransferRepository` is a placeholder and the Send action
+  is disabled, so no file leaves the device.
+- **The queue is not reachable from the UI.** `TransferQueue`,
+  `QueueTransfersUseCase` and `CancelTransferUseCase` exist, are registered and
+  are tested, but `TransferController` does not call them yet — a send needs the
+  pairing context and the handshake, both open (§34).
+- **Items are born `queued`, never `created` or `validating`.** Receiver-side
+  storage validation (§12) needs the control protocol, so the two leading
+  states of §8 exist in the state machine but are never entered (§9).
 - No pause/resume.
 - No folder transfer.
 - No transfer history — the user cannot review past transfers.
