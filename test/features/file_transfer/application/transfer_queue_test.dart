@@ -88,6 +88,10 @@ void main() {
   late RecordingLogSink sink;
   late List<Duration> delays;
 
+  /// The clock the queue reads. Tests move it by hand, so a window is
+  /// asserted exactly instead of racing the wall clock.
+  late DateTime now;
+
   /// Reassignable so a test can hold the next backoff open (the cancel-during-
   /// backoff case) without the queue knowing tests exist.
   late Future<void> Function(Duration duration) delay;
@@ -98,6 +102,7 @@ void main() {
     repo = ScriptedTransferRepository();
     sink = RecordingLogSink();
     delays = <Duration>[];
+    now = DateTime(2026, 10, 7, 12);
     delay = (Duration duration) {
       delays.add(duration);
       return Future<void>.value();
@@ -106,6 +111,7 @@ void main() {
       send: SendFileUseCase(repo),
       logger: StructuredLogger(sink: sink),
       delay: (Duration duration) => delay(duration),
+      clock: () => now,
     );
   });
 
@@ -392,6 +398,166 @@ void main() {
         () => queue.items.every((TransferItem item) => item.status.isTerminal),
       );
       await subscription.cancel();
+    });
+  });
+
+  group('transfer speed', () {
+    test('is measured from real bytes over real elapsed time', () async {
+      final StreamController<FileTransferProgress> hangingA =
+          StreamController<FileTransferProgress>();
+      repo.scripts['a.txt'] = (TransferRequest request) => hangingA.stream;
+
+      queue.enqueue(
+        destination: destination,
+        files: <SelectedFile>[file(name: 'a.txt', sizeInBytes: 10000000)],
+      );
+
+      hangingA.add(progress(bytes: 1000000, total: 10000000));
+      await until(
+        () => queue.items.single.bytesTransferred == 1000000,
+        reason: 'first byte report was not recorded',
+      );
+      // One sample is a position, not a rate: nothing has elapsed yet
+      // (`FEATURES.md` §22 — never fabricate a speed).
+      expect(queue.items.single.speedBytesPerSecond, isNull);
+
+      now = now.add(const Duration(seconds: 2));
+      hangingA.add(progress(bytes: 3000000, total: 10000000));
+      await until(
+        () => queue.items.single.speedBytesPerSecond == 1000000,
+        reason: '2 MB over 2 s was not measured',
+      );
+
+      hangingA.add(progress(bytes: 10000000, total: 10000000));
+      await hangingA.close();
+      await until(
+        () => queue.items.single.status == TransferStatus.completed,
+        reason: 'transfer did not finish',
+      );
+      // A finished transfer has no live rate to show.
+      expect(queue.items.single.speedBytesPerSecond, isNull);
+    });
+
+    test('averages over the trailing window after a stall', () async {
+      final StreamController<FileTransferProgress> hangingA =
+          StreamController<FileTransferProgress>();
+      repo.scripts['a.txt'] = (TransferRequest request) => hangingA.stream;
+
+      queue.enqueue(
+        destination: destination,
+        files: <SelectedFile>[file(name: 'a.txt', sizeInBytes: 10000000)],
+      );
+
+      hangingA.add(progress(bytes: 1000000, total: 10000000));
+      await until(
+        () => queue.items.single.bytesTransferred == 1000000,
+        reason: 'first byte report was not recorded',
+      );
+      now = now.add(const Duration(seconds: 2));
+      hangingA.add(progress(bytes: 3000000, total: 10000000));
+      await until(
+        () => queue.items.single.speedBytesPerSecond == 1000000,
+        reason: '2 MB over 2 s was not measured',
+      );
+
+      // Ten quiet seconds, then one more byte report. The rate drops to what
+      // the window can actually support instead of keeping the old number or
+      // inventing a constant.
+      now = now.add(const Duration(seconds: 10));
+      hangingA.add(progress(bytes: 4000000, total: 10000000));
+      await until(
+        () => queue.items.single.speedBytesPerSecond == 100000,
+        reason: 'windowed rate after the stall was not measured',
+      );
+
+      // Finish before closing: a controller closed mid-transfer *is* a dropped
+      // connection, which the queue would retry after the test has ended.
+      hangingA.add(progress(bytes: 10000000, total: 10000000));
+      await hangingA.close();
+      await until(
+        () => queue.items.single.status == TransferStatus.completed,
+        reason: 'transfer did not finish',
+      );
+      expect(queue.items.single.speedBytesPerSecond, isNull);
+    });
+
+    test('a retry starts speed measurement from scratch', () async {
+      final StreamController<FileTransferProgress> attempt1 =
+          StreamController<FileTransferProgress>();
+      final StreamController<FileTransferProgress> attempt2 =
+          StreamController<FileTransferProgress>();
+      int calls = 0;
+      final List<StreamController<FileTransferProgress>> attempts =
+          <StreamController<FileTransferProgress>>[attempt1, attempt2];
+      repo.scripts['flaky.txt'] = (TransferRequest request) =>
+          attempts[calls++].stream;
+
+      // The backoff is held open so the retrying state can be observed: with
+      // an instant delay it would pass between two polls of `until`.
+      final Completer<void> retryGate = Completer<void>();
+      delay = (Duration duration) {
+        delays.add(duration);
+        return retryGate.future;
+      };
+
+      queue.enqueue(
+        destination: destination,
+        files: <SelectedFile>[file(name: 'flaky.txt', sizeInBytes: 10000000)],
+      );
+
+      attempt1.add(progress(bytes: 1000000, total: 10000000));
+      await until(
+        () => queue.items.single.bytesTransferred == 1000000,
+        reason: 'attempt 1 first byte report was not recorded',
+      );
+      now = now.add(const Duration(seconds: 1));
+      attempt1.add(progress(bytes: 3000000, total: 10000000));
+      await until(
+        () => queue.items.single.speedBytesPerSecond == 2000000,
+        reason: 'attempt 1 rate was not measured',
+      );
+
+      attempt1.addError(TransferFailure.connectionLost);
+      await until(
+        () => queue.items.single.status == TransferStatus.retrying,
+        reason: 'the retryable failure did not enter backoff',
+      );
+      // No rate for an attempt that is not running (`FEATURES.md` §22).
+      expect(queue.items.single.speedBytesPerSecond, isNull);
+      expect(delays, <Duration>[TransferQueue.firstBackoff]);
+
+      retryGate.complete();
+      await until(
+        () => repo.sends.length == 2,
+        reason: 'the second attempt never started',
+      );
+
+      now = now.add(const Duration(seconds: 5));
+      attempt2.add(progress(bytes: 1000000, total: 10000000));
+      await until(
+        () => queue.items.single.bytesTransferred == 1000000,
+        reason: 'attempt 2 first byte report was not recorded',
+      );
+      // If attempt 1 samples had survived, this would already be a rate.
+      expect(queue.items.single.speedBytesPerSecond, isNull);
+
+      // From scratch: 2 MB over 1 s.
+      now = now.add(const Duration(seconds: 1));
+      attempt2.add(progress(bytes: 3000000, total: 10000000));
+      await until(
+        () => queue.items.single.speedBytesPerSecond == 2000000,
+        reason: 'attempt 2 rate was not measured from fresh samples',
+      );
+
+      attempt2.add(progress(bytes: 10000000, total: 10000000));
+      await attempt2.close();
+      await until(
+        () => queue.items.single.status == TransferStatus.completed,
+        reason: 'transfer did not finish',
+      );
+      expect(queue.items.single.speedBytesPerSecond, isNull);
+
+      await attempt1.close();
     });
   });
 

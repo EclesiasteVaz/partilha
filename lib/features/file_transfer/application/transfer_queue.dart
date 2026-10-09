@@ -23,7 +23,11 @@ class TransferQueue {
     // Injected so a test can assert the approved backoff without spending
     // three real seconds per retry case (`AGENTS.md` §60.1).
     Future<void> Function(Duration duration)? delay,
-  }) : _delay = delay ?? Future<void>.delayed;
+    // Injected so speed tests measure a window they control rather than the
+    // wall clock (`AGENTS.md` §60.1).
+    DateTime Function()? clock,
+  }) : _delay = delay ?? Future<void>.delayed,
+       _clock = clock ?? DateTime.now;
 
   /// Attempts per file, including the first (`AGENTS.md` §27).
   static const int maxAttempts = 3;
@@ -32,11 +36,25 @@ class TransferQueue {
   static const Duration firstBackoff = Duration(seconds: 1);
   static const Duration secondBackoff = Duration(seconds: 2);
 
+  /// How far back a speed averages (`docs/PROTOCOL.md` §18 calls the windowing
+  /// an implementation detail). Three seconds smooths a single late frame
+  /// without lagging visibly behind the wire.
+  static const Duration speedWindow = Duration(seconds: 3);
+
   final SendFileUseCase _send;
   final AppLogger _logger;
   final Future<void> Function(Duration duration) _delay;
+  final DateTime Function() _clock;
 
   final Map<String, TransferItem> _items = <String, TransferItem>{};
+
+  /// (when, cumulative bytes) observations per attempt, keyed by transfer id.
+  ///
+  /// Kept here rather than in the [TransferItem]: samples are observations
+  /// over time, not part of what an item *is* — only the measured result
+  /// belongs in the state the UI reads.
+  final Map<String, List<_SpeedSample>> _speedSamples =
+      <String, List<_SpeedSample>>{};
 
   final StreamController<List<TransferItem>> _updates =
       StreamController<List<TransferItem>>.broadcast();
@@ -244,8 +262,42 @@ class TransferQueue {
   void _onProgress(String id, FileTransferProgress progress) {
     final TransferItem? item = _items[id];
     if (item == null || item.status.isTerminal) return;
-    _items[id] = item.withProgress(progress.bytesTransferred);
+    _items[id] = item
+        .withProgress(progress.bytesTransferred)
+        .withSpeed(_speedFor(id, progress.bytesTransferred));
     _publish();
+  }
+
+  /// The speed over the trailing [speedWindow] ending now, or `null` when the
+  /// samples say nothing measurable yet.
+  ///
+  /// Derived only from what the repository reported and when
+  /// (`FEATURES.md` §22, `docs/PROTOCOL.md` §18): one sample means no elapsed
+  /// time, so `null` instead of a guess, and bytes restarting at zero — a new
+  /// attempt — clear the samples rather than produce a negative rate.
+  int? _speedFor(String id, int bytesTransferred) {
+    final DateTime now = _clock();
+    final List<_SpeedSample> samples = _speedSamples.putIfAbsent(
+      id,
+      () => <_SpeedSample>[],
+    );
+
+    if (samples.isNotEmpty && bytesTransferred < samples.last.bytes) {
+      samples.clear();
+    }
+    samples.add(_SpeedSample(at: now, bytes: bytesTransferred));
+
+    // Keep the newest window, but never fewer than two samples: dropping to
+    // one would leave nothing to divide by until the next event.
+    final DateTime cutoff = now.subtract(speedWindow);
+    while (samples.length > 2 && samples.first.at.isBefore(cutoff)) {
+      samples.removeAt(0);
+    }
+
+    final int elapsedMicros = now.difference(samples.first.at).inMicroseconds;
+    if (elapsedMicros <= 0) return null;
+    return ((bytesTransferred - samples.first.bytes) * 1000000 / elapsedMicros)
+        .round();
   }
 
   void _endSend(String id) {
@@ -289,6 +341,15 @@ class TransferQueue {
     }
 
     _items[id] = advanced;
+    if (next != TransferStatus.transferring) {
+      // Speed describes an attempt in flight. A finished, failed, cancelled or
+      // backing-off item has no rate to show, and a stale number would be a
+      // fabricated one (`FEATURES.md` §22).
+      _speedSamples.remove(id);
+      if (advanced.speedBytesPerSecond != null) {
+        _items[id] = advanced.withSpeed(null);
+      }
+    }
     _publish();
     return true;
   }
@@ -331,4 +392,12 @@ class _SendOutcome {
 
   /// The typed cause, present only for [_OutcomeStatus.failed].
   final Failure? failure;
+}
+
+/// One observation of (when, how many bytes) for one attempt.
+class _SpeedSample {
+  const _SpeedSample({required this.at, required this.bytes});
+
+  final DateTime at;
+  final int bytes;
 }

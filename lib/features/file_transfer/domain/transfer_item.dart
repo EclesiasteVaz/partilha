@@ -62,6 +62,7 @@ class TransferItem {
     required this.request,
     required this.status,
     this.bytesTransferred = 0,
+    this.speedBytesPerSecond,
     this.failure,
   });
 
@@ -72,6 +73,16 @@ class TransferItem {
 
   /// Bytes actually delivered, never estimated (`AGENTS.md` §20).
   final int bytesTransferred;
+
+  /// Real transfer speed in bytes per second, over the queue's trailing window
+  /// of byte samples (`FEATURES.md` §22, `docs/PROTOCOL.md` §18).
+  ///
+  /// `null` whenever no window can be measured yet — before a second sample
+  /// exists, after a retry restarts the count, or once the item leaves
+  /// [TransferStatus.transferring]. A stalled transfer must show a stale-free
+  /// `null` rather than the last speed it happened to reach (`AGENTS.md` §20,
+  /// §83).
+  final int? speedBytesPerSecond;
 
   /// The typed cause of a [TransferStatus.failed] item, and `null` for every
   /// other state — an item that is not failed must not carry a failure, or the
@@ -140,6 +151,7 @@ class TransferItem {
       request: request,
       status: next,
       bytesTransferred: bytesTransferred,
+      speedBytesPerSecond: speedBytesPerSecond,
       failure: failure,
     );
   }
@@ -152,6 +164,19 @@ class TransferItem {
     request: request,
     status: status,
     bytesTransferred: bytes,
+    speedBytesPerSecond: speedBytesPerSecond,
+    failure: failure,
+  );
+
+  /// Returns this item with a new measured [speed], regardless of state.
+  ///
+  /// Speed is set and cleared by the queue, which owns the sampling clock —
+  /// the item only carries the number (`AGENTS.md` §20).
+  TransferItem withSpeed(int? speed) => TransferItem(
+    request: request,
+    status: status,
+    bytesTransferred: bytesTransferred,
+    speedBytesPerSecond: speed,
     failure: failure,
   );
 
@@ -162,13 +187,20 @@ class TransferItem {
           other.request == request &&
           other.status == status &&
           other.bytesTransferred == bytesTransferred &&
+          other.speedBytesPerSecond == speedBytesPerSecond &&
           other.failure == failure;
 
   @override
-  int get hashCode => Object.hash(request, status, bytesTransferred, failure);
+  int get hashCode => Object.hash(
+    request,
+    status,
+    bytesTransferred,
+    speedBytesPerSecond,
+    failure,
+  );
 
   @override
   String toString() =>
       'TransferItem($transferId, $fileName, ${status.name}, '
-      '$bytesTransferred/$totalBytes)';
+      '$bytesTransferred/$totalBytes, ${speedBytesPerSecond ?? '-'} B/s)';
 }

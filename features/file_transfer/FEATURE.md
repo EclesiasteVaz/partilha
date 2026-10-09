@@ -346,10 +346,14 @@ TransferRequest
     id, destination, file, type — one unit of send work
 
 TransferStatus / TransferItem
-    the per-transfer state machine (§8, §9), immutable, with byte progress
+    the per-transfer state machine (§8, §9), immutable, with byte progress and
+    `speedBytesPerSecond` (nullable; null when unmeasurable/stale)
 
 TransferRepository
     Stream<FileTransferProgress> send(TransferRequest request)
+
+resolveFilenameConflict(String desiredName, bool Function(String candidate) exists)
+    deterministic, preserves extension, skips existing suffixed forms, never overwrites (domain policy §26)
 
 FileTransferProgress
     transferId, bytesTransferred, totalBytes
@@ -413,7 +417,7 @@ Implemented as `TransferQueue`:
 The retry delay is injectable so tests assert the approved backoff without
 spending three real seconds.
 
-Not yet implemented here: speed calculation, storage validation before a send
+Not yet implemented here: storage validation before a send (receiver-side, §12) and the controller → queue wiring (§3). Speed is measured in the queue (byte-accurate over elapsed time, windowed).
 (receiver-side, §12), and the controller → queue wiring (§3).
 
 ## 19. Data Layer

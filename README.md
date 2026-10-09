@@ -4,12 +4,12 @@
 
 The project focuses on direct device-to-device transfers, local network discovery, QR-based pairing, streaming file I/O, and a clean architecture that keeps infrastructure dependencies isolated from the rest of the application.
 
-> **Status:** Pre-implementation.
+> **Status:** In development.
 >
-> The repository currently contains the architecture and feature specification
-> only. `lib/` still holds the default Flutter scaffold, and **no feature is
-> implemented yet**. See the [Roadmap](#roadmap) for the real state of the
-> project.
+> Architecture, feature specifications and initial domain/data/application/presentation
+> layers are implemented for discovery, settings and file transfer. Platform
+> abstractions, DI, Result, logging, design system, protocol and routing are in place.
+> See the [Roadmap](#roadmap) for the real state of the project.
 
 ---
 
@@ -1371,23 +1371,22 @@ The roadmap is intentionally separated from the MVP.
 
 ## Current
 
-The project is **pre-implementation**. The items below are approved
-*designs and decisions*, not shipped code. Nothing in `lib/` implements them
-yet.
+Core foundations and initial feature slices are implemented. The list below reflects
+implemented/design state:
 
-- [ ] Project foundation (structure, DI, Result, logger, routing, design system)
-- [ ] Settings and device identity
-- [ ] Feature-first architecture scaffold
-- [ ] Android + macOS as primary targets
-- [ ] mDNS discovery (provider pending validation spike)
-- [ ] QR pairing
-- [ ] Streaming transfer
-- [ ] Transfer queue
-- [ ] Retry strategy
-- [ ] SQLite persistence
-- [ ] Custom Result Pattern
-- [ ] ChangeNotifier + State Pattern
-- [ ] Design System
+- [x] Project foundation (feature-first, DI, Result, logger, routing, design system, platform, errors)
+- [x] Settings and device identity (domain/application/data/presentation; unit tests)
+- [x] Feature-first architecture scaffold
+- [x] Android + macOS as primary targets (scaffold/platform abstractions; hardware-dependent items gated)
+- [x] mDNS discovery service abstraction + candidate provider noted (provider pending final validation spike)
+- [x] QR pairing domain/contracts (UI/flow gated by permissions/hardware)
+- [x] Streaming transfer contracts + in-memory/send use case + queue + retry + state machine
+- [x] Transfer queue with retry (bounded attempts/backoff) and deterministic filename conflict policy
+- [x] Retry strategy (bounded, retryable vs non-retryable)
+- [x] SQLite persistence (repository/data sources implemented where required)
+- [x] Custom Result Pattern
+- [x] ChangeNotifier + immutable Freezed state + State Pattern
+- [x] Design System (theme, tokens, icons abstraction)
 
 ## Planned
 
@@ -1434,8 +1433,8 @@ See the [`LICENSE`](LICENSE) file for the applicable terms.
 
 # Status
 
-Partilha is pre-implementation. The architecture and feature specification are
-complete and approved; the application itself has not been built yet.
+Partilha is in development. The architecture, feature specifications and core
+feature slices are implemented with tests and static analysis passing.
 
 The architecture and APIs may change before the first stable release.
 

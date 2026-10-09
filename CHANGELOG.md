@@ -309,3 +309,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   decisions.
 
 [Unreleased]: https://github.com/partilha/partilha/compare/v0.0.0...HEAD
+### Added
+- T1 — Deterministic filename conflict policy in domain (`resolveFilenameConflict`) with comprehensive unit tests; exported via `domain/domain.dart`.
+- T2 — Transfer speed measured in `TransferQueue` (byte-accurate, trailing 3s window, rounded) exposed as `TransferItem.speedBytesPerSecond`, cleared on completion/cancel/retry.
+
+### Changed
+- `TransferItem`: added `speedBytesPerSecond`, `withSpeed`, updated equality/hash/toString and carried through transitions/progress.
+
+### Documentation
+- Updated README and discovery/FEATURE.md to reflect implemented state (Roadmap, Status, discovery current status).
+

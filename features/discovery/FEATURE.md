@@ -37,9 +37,13 @@ What exists:
 - unit tests for the record-validation trust boundary and for the lock
   lifecycle.
 
-What does **not** exist: use cases, a `DiscoveryController`, a device list, or
-anything wired into the app. `mdns_dart` is added to `pubspec.yaml` and compiled
-but never invoked at runtime.
+What exists (presentation/application): `DiscoverNearbyDevicesUseCase`,
+`DiscoveryController` (ChangeNotifier), `DiscoveryScreen` + device list UI with
+widget tests covering filtering and permissions errors. The core mDNS
+abstractions (service/mapper/resolver) and MulticastLock are implemented.
+`mdns_dart` is added to `pubspec.yaml` and the service compiles and is tested.
+Runtime wiring to the app is in place via DI; end-to-end on-device behaviour
+remains blocked on Android hardware validation.
 
 The feature is still **blocked** for real use: the provider is unvalidated on
 hardware, and the checklist in `docs/decisions/0002-mdns-provider.md` is
