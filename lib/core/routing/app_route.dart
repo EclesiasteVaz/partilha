@@ -14,7 +14,13 @@ enum AppRoute {
   send('/send'),
 
   /// Where a user reviews the destination and selects files.
-  transfer('/transfer');
+  transfer('/transfer'),
+
+  /// Where the receiver shows a QR code for pairing.
+  showQr('/pair/show'),
+
+  /// Where the sender scans a QR code for pairing.
+  scanQr('/pair/scan');
 
   const AppRoute(this.location);
 

@@ -4,6 +4,7 @@
          empty device list rather than an error. Normal permission, so no runtime
          prompt is involved. See core/platform/multicast_lock.dart. -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
 
     <application
         android:label="partilha"

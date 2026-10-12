@@ -13,6 +13,10 @@ import 'package:partilha/features/file_transfer/application/application.dart';
 import 'package:partilha/features/file_transfer/data/data.dart';
 import 'package:partilha/features/file_transfer/domain/domain.dart';
 import 'package:partilha/features/file_transfer/presentation/presentation.dart';
+import 'package:partilha/features/pairing/application/application.dart';
+import 'package:partilha/features/pairing/data/data.dart';
+import 'package:partilha/features/pairing/domain/domain.dart';
+import 'package:partilha/features/pairing/presentation/presentation.dart';
 import 'package:partilha/features/settings/application/application.dart';
 import 'package:partilha/features/settings/data/data.dart';
 import 'package:partilha/features/settings/domain/domain.dart';
@@ -239,6 +243,37 @@ void configureDependencies({required AppLogger logger}) {
     ..registerFactory<TransferScreen>(
       () => TransferScreen(
         controller: injectionContainer.resolve<TransferController>(),
+      ),
+    )
+    ..registerLazySingleton<PairingRepository>(
+      SecureStoragePairingRepository.new,
+    )
+    ..registerLazySingleton<QrCodeService>(JsonQrCodeService.new)
+    ..registerFactory<GetDeviceIdentityUseCase>(
+      () => GetDeviceIdentityUseCase(
+        injectionContainer.resolve<PairingRepository>(),
+      ),
+    )
+    ..registerFactory<ValidateQrCodeUseCase>(
+      () => ValidateQrCodeUseCase(injectionContainer.resolve<QrCodeService>()),
+    )
+    ..registerLazySingleton<PairingController>(
+      () => PairingController(
+        getDeviceIdentityUseCase: injectionContainer
+            .resolve<GetDeviceIdentityUseCase>(),
+        validateQrCodeUseCase: injectionContainer
+            .resolve<ValidateQrCodeUseCase>(),
+        settingsRepository: injectionContainer.resolve<SettingsRepository>(),
+      ),
+    )
+    ..registerFactory<ShowQrScreen>(
+      () => ShowQrScreen(
+        controller: injectionContainer.resolve<PairingController>(),
+      ),
+    )
+    ..registerFactory<ScanQrScreen>(
+      () => ScanQrScreen(
+        controller: injectionContainer.resolve<PairingController>(),
       ),
     );
 }
