@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:partilha/core/errors/failure.dart';
@@ -56,9 +58,35 @@ sealed class TransferState with _$TransferState {
 /// discovery controller, which has a stream result that can arrive late
 /// (`AGENTS.md` §81).
 class TransferController extends ChangeNotifier {
-  TransferController({required this._selectFiles});
+  TransferController({
+    required this.selectFiles,
+    this.queueTransfers,
+    this.cancelTransferUseCase,
+    this.transferQueue,
+  }) {
+    _initQueueSubscription();
+  }
 
-  final SelectFilesUseCase _selectFiles;
+  final SelectFilesUseCase selectFiles;
+  final QueueTransfersUseCase? queueTransfers;
+  final CancelTransferUseCase? cancelTransferUseCase;
+  final TransferQueue? transferQueue;
+
+  StreamSubscription<List<TransferItem>>? _queueSubscription;
+  List<TransferItem> _queueItems = const <TransferItem>[];
+
+  List<TransferItem> get queueItems => _queueItems;
+
+  void _initQueueSubscription() {
+    final queue = transferQueue;
+    if (queue != null) {
+      _queueItems = queue.items;
+      _queueSubscription = queue.updates.listen((items) {
+        _queueItems = items;
+        notifyListeners();
+      });
+    }
+  }
 
   TransferState _state = const TransferState();
 
@@ -103,7 +131,7 @@ class TransferController extends ChangeNotifier {
       _state.copyWith(status: TransferSetupStatus.selectingFiles, error: null),
     );
 
-    final Result<List<SelectedFile>, Failure> result = await _selectFiles();
+    final Result<List<SelectedFile>, Failure> result = await selectFiles();
 
     switch (result) {
       case Success(:final value):
@@ -143,6 +171,33 @@ class TransferController extends ChangeNotifier {
   /// enabled with an empty queue.
   static TransferSetupStatus _statusFor(List<SelectedFile> files) =>
       files.isEmpty ? TransferSetupStatus.initial : TransferSetupStatus.ready;
+
+  /// Puts the current selection on the transfer queue.
+  Future<void> sendTransfers() async {
+    final destination = _state.destination;
+    final queue = queueTransfers;
+    if (queue == null || destination == null || _state.files.isEmpty) {
+      return;
+    }
+    final result = await queue.call(
+      destination: destination,
+      files: _state.files,
+    );
+    if (result.isFailure) {
+      _emit(_state.copyWith(error: result.errorOrNull));
+    }
+  }
+
+  /// Cancels an in-flight, queued or backing-off transfer by its ID.
+  void cancelTransfer(String transferId) {
+    cancelTransferUseCase?.call(transferId);
+  }
+
+  @override
+  void dispose() {
+    unawaited(_queueSubscription?.cancel());
+    super.dispose();
+  }
 
   void _emit(TransferState next) {
     _state = next;

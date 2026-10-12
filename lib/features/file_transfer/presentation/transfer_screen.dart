@@ -92,7 +92,12 @@ class _Body extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
           ],
           Expanded(
-            child: state.files.isEmpty
+            child: controller.queueItems.isNotEmpty
+                ? _QueueList(
+                    items: controller.queueItems,
+                    onCancel: controller.cancelTransfer,
+                  )
+                : state.files.isEmpty
                 ? _EmptySelection(
                     isOpen: state.status == TransferSetupStatus.selectingFiles,
                   )
@@ -102,30 +107,37 @@ class _Body extends StatelessWidget {
                   ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          FilledButton.icon(
-            onPressed: controller.pickFiles,
-            icon: const AppIcon(AppIcons.add, size: AppIconSizes.md),
-            label: Text(
-              state.files.isEmpty ? 'Choose files' : 'Add more files',
+          if (controller.queueItems.isEmpty) ...<Widget>[
+            FilledButton.icon(
+              onPressed: controller.pickFiles,
+              icon: const AppIcon(AppIcons.add, size: AppIconSizes.md),
+              label: Text(
+                state.files.isEmpty ? 'Choose files' : 'Add more files',
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          // Disabled rather than absent: the flow visibly ends here instead of
-          // quietly doing nothing when tapped.
-          FilledButton.icon(
-            onPressed: null,
-            icon: const AppIcon(AppIcons.send, size: AppIconSizes.md),
-            label: const Text('Send'),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          SizedBox(
-            width: double.infinity,
-            child: Text(
-              'Transferring is not available yet.',
-              style: context.textStyles.bodySmall,
-              textAlign: TextAlign.center,
+            const SizedBox(height: AppSpacing.sm),
+            FilledButton.icon(
+              onPressed:
+                  (state.status == TransferSetupStatus.ready &&
+                      state.destination != null &&
+                      state.destination!.token != null)
+                  ? controller.sendTransfers
+                  : null,
+              icon: const AppIcon(AppIcons.send, size: AppIconSizes.md),
+              label: const Text('Send'),
             ),
-          ),
+            if (state.destination?.token == null) ...<Widget>[
+              const SizedBox(height: AppSpacing.xs),
+              SizedBox(
+                width: double.infinity,
+                child: Text(
+                  'Transferring is not available yet.',
+                  style: context.textStyles.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ],
           const SizedBox(height: AppSpacing.sm),
         ],
       ),
@@ -257,3 +269,118 @@ String _formatBytes(int? bytes) {
 
 String _formatTotal(int? bytes) =>
     bytes == null ? 'Total unknown' : _formatBytes(bytes);
+
+class _QueueList extends StatelessWidget {
+  const _QueueList({required this.items, required this.onCancel});
+
+  final List<TransferItem> items;
+  final void Function(String id) onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      itemCount: items.length,
+      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.xs),
+      itemBuilder: (BuildContext context, int index) {
+        final TransferItem item = items[index];
+        final double? progress = item.fraction;
+        final String speedText = item.speedBytesPerSecond != null
+            ? '${_formatBytes(item.speedBytesPerSecond)}/s'
+            : '';
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    const AppIcon(AppIcons.file, size: AppIconSizes.md),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        item.fileName,
+                        style: context.textStyles.titleMedium,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    _StatusChip(status: item.status),
+                    if (!item.status.isTerminal)
+                      IconButton(
+                        onPressed: () => onCancel(item.transferId),
+                        icon: const AppIcon(
+                          AppIcons.remove,
+                          size: AppIconSizes.sm,
+                        ),
+                        tooltip: 'Cancel transfer',
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                if (!item.status.isTerminal) ...<Widget>[
+                  LinearProgressIndicator(value: progress),
+                  const SizedBox(height: AppSpacing.xxs),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: <Widget>[
+                      Text(
+                        '${_formatBytes(item.bytesTransferred)} / ${_formatBytes(item.totalBytes)}',
+                        style: context.textStyles.bodySmall,
+                      ),
+                      if (speedText.isNotEmpty)
+                        Text(speedText, style: context.textStyles.bodySmall),
+                    ],
+                  ),
+                ],
+                if (item.failure != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.xxs),
+                    child: Text(
+                      item.failure!.userMessage,
+                      style: context.textStyles.bodySmall.copyWith(
+                        color: context.colors.danger,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.status});
+
+  final TransferStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final String label = switch (status) {
+      TransferStatus.created => 'Created',
+      TransferStatus.validating => 'Validating',
+      TransferStatus.queued => 'Queued',
+      TransferStatus.starting => 'Starting',
+      TransferStatus.transferring => 'Transferring',
+      TransferStatus.retrying => 'Retrying',
+      TransferStatus.completed => 'Done',
+      TransferStatus.failed => 'Failed',
+      TransferStatus.cancelled => 'Cancelled',
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: AppSpacing.xxs,
+      ),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceMuted,
+        borderRadius: BorderRadius.circular(AppSpacing.xxs),
+      ),
+      child: Text(label, style: context.textStyles.labelMedium),
+    );
+  }
+}

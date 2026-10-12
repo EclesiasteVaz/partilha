@@ -19,6 +19,8 @@ class TransferDestination {
     required this.deviceName,
     required this.address,
     required this.port,
+    this.token,
+    this.certificateFingerprint,
   });
 
   /// Identity claimed by the announcement. **Not** proof of identity: pairing
@@ -31,6 +33,12 @@ class TransferDestination {
   final String address;
   final int port;
 
+  /// Pairing token provided via QR code.
+  final String? token;
+
+  /// Pin of the certificate for TLS verification, if provided.
+  final String? certificateFingerprint;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -38,10 +46,19 @@ class TransferDestination {
           other.deviceId == deviceId &&
           other.deviceName == deviceName &&
           other.address == address &&
-          other.port == port;
+          other.port == port &&
+          other.token == token &&
+          other.certificateFingerprint == certificateFingerprint;
 
   @override
-  int get hashCode => Object.hash(deviceId, deviceName, address, port);
+  int get hashCode => Object.hash(
+    deviceId,
+    deviceName,
+    address,
+    port,
+    token,
+    certificateFingerprint,
+  );
 
   @override
   String toString() =>

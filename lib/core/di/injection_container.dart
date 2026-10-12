@@ -230,6 +230,10 @@ void configureDependencies({required AppLogger logger}) {
     ..registerLazySingleton<TransferController>(
       () => TransferController(
         selectFiles: injectionContainer.resolve<SelectFilesUseCase>(),
+        queueTransfers: injectionContainer.resolve<QueueTransfersUseCase>(),
+        cancelTransferUseCase: injectionContainer
+            .resolve<CancelTransferUseCase>(),
+        transferQueue: injectionContainer.resolve<TransferQueue>(),
       ),
     )
     ..registerFactory<TransferScreen>(
