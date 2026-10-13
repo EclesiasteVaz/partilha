@@ -108,8 +108,9 @@ class AppRouterDelegate extends RouterDelegate<AppRoute>
       child: ScanQrScreen(
         controller: injectionContainer.resolve<PairingController>(),
         onPaired: () {
-          final pairingState =
-              injectionContainer.resolve<PairingController>().state;
+          final pairingState = injectionContainer
+              .resolve<PairingController>()
+              .state;
           if (pairingState is PairingStatePaired) {
             final contextData = pairingState.context;
             injectionContainer.resolve<TransferController>().setDestination(

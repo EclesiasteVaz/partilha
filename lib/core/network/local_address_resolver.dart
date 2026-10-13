@@ -56,9 +56,7 @@ final class NetworkInterfaceDeviceAddressResolver
       return Result.failure(
         NetworkFailure(
           cause: e,
-          context: const <String, Object?>{
-            'operation': 'getLocalIpv4Address',
-          },
+          context: const <String, Object?>{'operation': 'getLocalIpv4Address'},
         ),
       );
     }

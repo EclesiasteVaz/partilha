@@ -78,7 +78,9 @@ void main() {
     transferServer = FakeTransferServer();
     addressResolver = FakeDeviceAddressResolver();
     pairingController = PairingController(
-      getDeviceIdentityUseCase: GetDeviceIdentityUseCase(FakePairingRepository()),
+      getDeviceIdentityUseCase: GetDeviceIdentityUseCase(
+        FakePairingRepository(),
+      ),
       validateQrCodeUseCase: const ValidateQrCodeUseCase(JsonQrCodeService()),
       settingsRepository: FakeSettingsRepository(),
     );
@@ -94,30 +96,36 @@ void main() {
   });
 
   group('ReceiverController', () {
-    test('startReceiving binds server and triggers pairing QR payload generation', () async {
-      expect(transferServer.isRunning, isFalse);
-      expect(pairingController.state, const PairingState.initial());
+    test(
+      'startReceiving binds server and triggers pairing QR payload generation',
+      () async {
+        expect(transferServer.isRunning, isFalse);
+        expect(pairingController.state, const PairingState.initial());
 
-      await receiverController.startReceiving();
+        await receiverController.startReceiving();
 
-      expect(transferServer.isRunning, isTrue);
-      expect(transferServer.port, 8888);
-      expect(pairingController.state, isA<PairingStateShowingQr>());
+        expect(transferServer.isRunning, isTrue);
+        expect(transferServer.port, 8888);
+        expect(pairingController.state, isA<PairingStateShowingQr>());
 
-      final showingState = pairingController.state as PairingStateShowingQr;
-      expect(showingState.payload.host, '192.168.1.42');
-      expect(showingState.payload.port, 8888);
-      expect(showingState.payload.deviceName, 'Receiver Mac');
-      expect(showingState.payload.token, 'secret-tok');
-    });
+        final showingState = pairingController.state as PairingStateShowingQr;
+        expect(showingState.payload.host, '192.168.1.42');
+        expect(showingState.payload.port, 8888);
+        expect(showingState.payload.deviceName, 'Receiver Mac');
+        expect(showingState.payload.token, 'secret-tok');
+      },
+    );
 
-    test('stopReceiving stops transfer server and resets pairing state', () async {
-      await receiverController.startReceiving();
-      expect(transferServer.isRunning, isTrue);
+    test(
+      'stopReceiving stops transfer server and resets pairing state',
+      () async {
+        await receiverController.startReceiving();
+        expect(transferServer.isRunning, isTrue);
 
-      await receiverController.stopReceiving();
-      expect(transferServer.isRunning, isFalse);
-      expect(pairingController.state, const PairingState.initial());
-    });
+        await receiverController.stopReceiving();
+        expect(transferServer.isRunning, isFalse);
+        expect(pairingController.state, const PairingState.initial());
+      },
+    );
   });
 }

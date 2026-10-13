@@ -255,19 +255,19 @@ void configureDependencies({required AppLogger logger}) {
         destinationDirectoryProvider: null,
         expectedTokenProvider: () =>
             injectionContainer.resolve<PairingController>().state
-                    is PairingStateShowingQr
-                ? (injectionContainer.resolve<PairingController>().state
-                        as PairingStateShowingQr)
-                    .payload
-                    .token
-                : null,
+                is PairingStateShowingQr
+            ? (injectionContainer.resolve<PairingController>().state
+                      as PairingStateShowingQr)
+                  .payload
+                  .token
+            : null,
       ),
     )
     ..registerLazySingleton<ReceiverController>(
       () => ReceiverController(
         transferServer: injectionContainer.resolve<TransferServer>(),
-        deviceAddressResolver:
-            injectionContainer.resolve<DeviceAddressResolver>(),
+        deviceAddressResolver: injectionContainer
+            .resolve<DeviceAddressResolver>(),
         pairingController: injectionContainer.resolve<PairingController>(),
       ),
     )
