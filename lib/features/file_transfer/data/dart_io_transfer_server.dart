@@ -31,7 +31,7 @@ final class DartIoTransferServer implements TransferServer {
   final AppLogger _logger;
   final StorageValidationService? storageValidation;
   final Directory Function()? destinationDirectoryProvider;
-  final String Function()? expectedTokenProvider;
+  final String? Function()? expectedTokenProvider;
 
   final StreamController<TransferServerEvent> _events =
       StreamController<TransferServerEvent>.broadcast();
@@ -41,6 +41,7 @@ final class DartIoTransferServer implements TransferServer {
   StreamSubscription<HttpRequest>? _subscription;
 
   /// The active bound port of the server, or `null` if not running.
+  @override
   int? get port => _server?.port;
 
   @override

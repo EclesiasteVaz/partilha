@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:partilha/core/errors/failure.dart';
+import 'package:partilha/core/routing/routing.dart';
 import 'package:partilha/core/theme/theme.dart';
 import 'package:partilha/features/file_transfer/domain/domain.dart';
 import 'package:partilha/features/file_transfer/presentation/transfer_controller.dart';
@@ -127,6 +128,12 @@ class _Body extends StatelessWidget {
               label: const Text('Send'),
             ),
             if (state.destination?.token == null) ...<Widget>[
+              const SizedBox(height: AppSpacing.sm),
+              OutlinedButton.icon(
+                onPressed: () => pushRoute(context, AppRoute.scanQr),
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('Scan QR Code to Pair'),
+              ),
               const SizedBox(height: AppSpacing.xs),
               SizedBox(
                 width: double.infinity,

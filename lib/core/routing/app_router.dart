@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:partilha/core/di/di.dart';
 import 'package:partilha/core/routing/app_route.dart';
 import 'package:partilha/features/discovery/presentation/discovery_screen.dart';
+import 'package:partilha/features/file_transfer/domain/domain.dart';
 import 'package:partilha/features/file_transfer/presentation/presentation.dart';
 import 'package:partilha/features/pairing/presentation/presentation.dart';
 import 'package:partilha/features/settings/presentation/settings_screen.dart';
@@ -93,11 +94,38 @@ class AppRouterDelegate extends RouterDelegate<AppRoute>
     ),
     AppRoute.showQr => MaterialPage<void>(
       key: const ValueKey<String>('show_qr'),
-      child: injectionContainer.resolve<ShowQrScreen>(),
+      child: ShowQrScreen(
+        controller: injectionContainer.resolve<PairingController>(),
+        onDismiss: () {
+          unawaited(
+            injectionContainer.resolve<ReceiverController>().stopReceiving(),
+          );
+        },
+      ),
     ),
     AppRoute.scanQr => MaterialPage<void>(
       key: const ValueKey<String>('scan_qr'),
-      child: injectionContainer.resolve<ScanQrScreen>(),
+      child: ScanQrScreen(
+        controller: injectionContainer.resolve<PairingController>(),
+        onPaired: () {
+          final pairingState =
+              injectionContainer.resolve<PairingController>().state;
+          if (pairingState is PairingStatePaired) {
+            final contextData = pairingState.context;
+            injectionContainer.resolve<TransferController>().setDestination(
+              TransferDestination(
+                deviceId: contextData.peerDeviceId,
+                deviceName: contextData.peerDeviceName,
+                address: contextData.peerHost,
+                port: contextData.peerPort,
+                token: contextData.token,
+                certificateFingerprint: contextData.certificateFingerprint,
+              ),
+            );
+            _currentRoute.go(AppRoute.transfer);
+          }
+        },
+      ),
     ),
   };
 

@@ -245,6 +245,32 @@ void configureDependencies({required AppLogger logger}) {
         controller: injectionContainer.resolve<TransferController>(),
       ),
     )
+    ..registerLazySingleton<DeviceAddressResolver>(
+      NetworkInterfaceDeviceAddressResolver.new,
+    )
+    ..registerLazySingleton<TransferServer>(
+      () => DartIoTransferServer(
+        injectionContainer.resolve<AppLogger>(),
+        storageValidation: null,
+        destinationDirectoryProvider: null,
+        expectedTokenProvider: () =>
+            injectionContainer.resolve<PairingController>().state
+                    is PairingStateShowingQr
+                ? (injectionContainer.resolve<PairingController>().state
+                        as PairingStateShowingQr)
+                    .payload
+                    .token
+                : null,
+      ),
+    )
+    ..registerLazySingleton<ReceiverController>(
+      () => ReceiverController(
+        transferServer: injectionContainer.resolve<TransferServer>(),
+        deviceAddressResolver:
+            injectionContainer.resolve<DeviceAddressResolver>(),
+        pairingController: injectionContainer.resolve<PairingController>(),
+      ),
+    )
     ..registerLazySingleton<PairingRepository>(
       SecureStoragePairingRepository.new,
     )

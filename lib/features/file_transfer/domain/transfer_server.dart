@@ -95,6 +95,9 @@ final class TransferServerError extends TransferServerEvent {
 abstract interface class TransferServer {
   Stream<TransferServerEvent> get events;
 
+  /// The active bound port of the server, or `null` if stopped.
+  int? get port;
+
   Future<Result<void, Failure>> start({required int port});
 
   Future<Result<void, Failure>> stop();

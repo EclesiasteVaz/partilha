@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:partilha/core/di/di.dart';
 import 'package:partilha/core/routing/routing.dart';
 import 'package:partilha/core/theme/theme.dart';
+import 'package:partilha/features/file_transfer/presentation/presentation.dart';
 import 'package:partilha/features/settings/domain/domain.dart';
 import 'package:partilha/features/settings/presentation/settings_controller.dart';
 
@@ -153,14 +155,28 @@ class _DeviceNameSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.md),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.tonal(
-            // Pushed rather than replacing Settings, so Back returns to the
-            // device name the user may have just edited (`AGENTS.md` §49).
-            onPressed: () => pushRoute(context, AppRoute.send),
-            child: const Text('Send files'),
-          ),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: <Widget>[
+            FilledButton.tonal(
+              // Pushed rather than replacing Settings, so Back returns to the
+              // device name the user may have just edited (`AGENTS.md` §49).
+              onPressed: () => pushRoute(context, AppRoute.send),
+              child: const Text('Send files'),
+            ),
+            FilledButton.tonal(
+              onPressed: () {
+                unawaited(
+                  injectionContainer
+                      .resolve<ReceiverController>()
+                      .startReceiving(),
+                );
+                pushRoute(context, AppRoute.showQr);
+              },
+              child: const Text('Receive files'),
+            ),
+          ],
         ),
       ],
     );

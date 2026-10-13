@@ -44,7 +44,18 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         final DiscoveryState state = widget.controller.state;
 
         return Scaffold(
-          appBar: AppBar(title: const Text('Find devices nearby')),
+          appBar: AppBar(
+            title: const Text('Find devices nearby'),
+            actions: [
+              IconButton(
+                tooltip: 'Scan QR Code',
+                icon: const Icon(Icons.qr_code_scanner),
+                onPressed: () {
+                  pushRoute(context, AppRoute.scanQr);
+                },
+              ),
+            ],
+          ),
           body: SafeArea(
             child: Center(
               child: ConstrainedBox(

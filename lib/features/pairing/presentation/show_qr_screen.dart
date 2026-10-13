@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:partilha/core/theme/theme.dart';
 import 'package:partilha/features/pairing/presentation/pairing_controller.dart';
@@ -8,14 +10,34 @@ import 'package:qr_flutter/qr_flutter.dart';
 ///
 /// Follows `features/pairing/FEATURE.md` §27 (semantic label and accessible alternative).
 class ShowQrScreen extends StatelessWidget {
-  const ShowQrScreen({super.key, required this.controller});
+  const ShowQrScreen({
+    super.key,
+    required this.controller,
+    this.onDismiss,
+  });
 
   final PairingController controller;
+  final VoidCallback? onDismiss;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Pair Device')),
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          onDismiss?.call();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Pair Device'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              onDismiss?.call();
+              unawaited(Navigator.of(context).maybePop());
+            },
+          ),
+        ),
       body: ListenableBuilder(
         listenable: controller,
         builder: (context, _) {
@@ -120,6 +142,6 @@ class ShowQrScreen extends StatelessWidget {
           };
         },
       ),
-    );
+    ),);
   }
 }
