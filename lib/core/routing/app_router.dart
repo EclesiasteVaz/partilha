@@ -96,6 +96,7 @@ class AppRouterDelegate extends RouterDelegate<AppRoute>
       key: const ValueKey<String>('show_qr'),
       child: ShowQrScreen(
         controller: injectionContainer.resolve<PairingController>(),
+        receiverController: injectionContainer.resolve<ReceiverController>(),
         onDismiss: () {
           unawaited(
             injectionContainer.resolve<ReceiverController>().stopReceiving(),

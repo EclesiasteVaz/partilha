@@ -2,21 +2,34 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:partilha/core/theme/theme.dart';
+import 'package:partilha/features/file_transfer/presentation/receiver_controller.dart';
 import 'package:partilha/features/pairing/presentation/pairing_controller.dart';
 import 'package:partilha/features/pairing/presentation/pairing_state.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-/// Screen displayed by the receiver showing the pairing QR code.
+/// Screen displayed by the receiver showing the pairing QR code and live
+/// reception feedback.
 ///
-/// Follows `features/pairing/FEATURE.md` §27 (semantic label and accessible alternative).
+/// Follows `features/pairing/FEATURE.md` §27 (semantic label and accessible alternative)
+/// and `features/file_transfer/FEATURE.md` §6 (transfer progress, destination storage).
 class ShowQrScreen extends StatelessWidget {
-  const ShowQrScreen({super.key, required this.controller, this.onDismiss});
+  const ShowQrScreen({
+    super.key,
+    required this.controller,
+    this.receiverController,
+    this.onDismiss,
+  });
 
   final PairingController controller;
+  final ReceiverController? receiverController;
   final VoidCallback? onDismiss;
 
   @override
   Widget build(BuildContext context) {
+    final Listenable listenable = receiverController != null
+        ? Listenable.merge(<Listenable>[controller, receiverController!])
+        : controller;
+
     return PopScope(
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) {
@@ -25,7 +38,7 @@ class ShowQrScreen extends StatelessWidget {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Pair Device'),
+          title: const Text('Receive Files'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
@@ -35,7 +48,7 @@ class ShowQrScreen extends StatelessWidget {
           ),
         ),
         body: ListenableBuilder(
-          listenable: controller,
+          listenable: listenable,
           builder: (context, _) {
             final state = controller.state;
 
@@ -80,12 +93,12 @@ class ShowQrScreen extends StatelessWidget {
                             child: QrImageView(
                               data: rawQrString,
                               version: QrVersions.auto,
-                              size: 240,
+                              size: 220,
                               backgroundColor: Colors.white,
                             ),
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
                         Text(
                           payload.deviceName,
                           style: context.textStyles.titleMedium,
@@ -97,6 +110,12 @@ class ShowQrScreen extends StatelessWidget {
                             color: context.colors.onSurfaceMuted,
                           ),
                         ),
+                        if (receiverController != null) ...[
+                          const SizedBox(height: 24),
+                          _ReceiverStatusSection(
+                            receiver: receiverController!,
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -141,4 +160,171 @@ class ShowQrScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ReceiverStatusSection extends StatelessWidget {
+  const _ReceiverStatusSection({required this.receiver});
+
+  final ReceiverController receiver;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeOffer = receiver.currentOffer;
+    final receivedFiles = receiver.receivedFiles;
+    final lastError = receiver.lastError;
+
+    if (activeOffer == null && receivedFiles.isEmpty && lastError == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: context.colors.surfaceMuted,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.radio_button_checked,
+              size: 16,
+              color: Colors.green,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Ready to receive files',
+              style: context.textStyles.bodySmall,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (lastError != null) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: context.colors.danger.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: context.colors.danger),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, color: context.colors.danger, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    lastError.userMessage,
+                    style: context.textStyles.bodySmall.copyWith(
+                      color: context.colors.danger,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (activeOffer != null) ...[
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.downloading, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Receiving ${activeOffer.name}...',
+                          style: context.textStyles.titleSmall,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  LinearProgressIndicator(
+                    value: activeOffer.sizeInBytes != null &&
+                            activeOffer.sizeInBytes! > 0
+                        ? (receiver.currentReceivedBytes /
+                                activeOffer.sizeInBytes!)
+                            .clamp(0.0, 1.0)
+                        : null,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    activeOffer.sizeInBytes != null
+                        ? '${_formatBytes(receiver.currentReceivedBytes)} / ${_formatBytes(activeOffer.sizeInBytes)}'
+                        : _formatBytes(receiver.currentReceivedBytes),
+                    style: context.textStyles.bodySmall.copyWith(
+                      color: context.colors.onSurfaceMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (receivedFiles.isNotEmpty) ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Received Files (${receivedFiles.length})',
+              style: context.textStyles.titleSmall,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Saved to Downloads folder',
+              style: context.textStyles.labelMedium.copyWith(
+                color: context.colors.onSurfaceMuted,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...receivedFiles.map(
+            (file) => Card(
+              margin: const EdgeInsets.only(bottom: 6),
+              child: ListTile(
+                dense: true,
+                leading: const Icon(
+                  Icons.check_circle,
+                  color: Colors.green,
+                  size: 20,
+                ),
+                title: Text(
+                  file.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.textStyles.bodyMedium,
+                ),
+                subtitle: Text(
+                  _formatBytes(file.sizeInBytes),
+                  style: context.textStyles.bodySmall.copyWith(
+                    color: context.colors.onSurfaceMuted,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+String _formatBytes(int? bytes) {
+  if (bytes == null) return 'Size unknown';
+  if (bytes < 1024) return '$bytes B';
+  final double kilobytes = bytes / 1024;
+  if (kilobytes < 1024) return '${kilobytes.toStringAsFixed(1)} KB';
+  final double megabytes = kilobytes / 1024;
+  if (megabytes < 1024) return '${megabytes.toStringAsFixed(1)} MB';
+  return '${(megabytes / 1024).toStringAsFixed(2)} GB';
 }

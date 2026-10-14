@@ -183,6 +183,16 @@ void configureDependencies({required AppLogger logger}) {
         injectionContainer.resolve<DiscoveryService>(),
       ),
     )
+    ..registerFactory<StartAdvertisingUseCase>(
+      () => StartAdvertisingUseCase(
+        injectionContainer.resolve<DiscoveryService>(),
+      ),
+    )
+    ..registerFactory<StopAdvertisingUseCase>(
+      () => StopAdvertisingUseCase(
+        injectionContainer.resolve<DiscoveryService>(),
+      ),
+    )
     ..registerFactory<DiscoveryController>(
       () => DiscoveryController(
         discoverNearbyDevices: injectionContainer
@@ -269,6 +279,10 @@ void configureDependencies({required AppLogger logger}) {
         deviceAddressResolver: injectionContainer
             .resolve<DeviceAddressResolver>(),
         pairingController: injectionContainer.resolve<PairingController>(),
+        startAdvertisingUseCase: injectionContainer
+            .resolve<StartAdvertisingUseCase>(),
+        stopAdvertisingUseCase: injectionContainer
+            .resolve<StopAdvertisingUseCase>(),
       ),
     )
     ..registerLazySingleton<PairingRepository>(
@@ -295,6 +309,7 @@ void configureDependencies({required AppLogger logger}) {
     ..registerFactory<ShowQrScreen>(
       () => ShowQrScreen(
         controller: injectionContainer.resolve<PairingController>(),
+        receiverController: injectionContainer.resolve<ReceiverController>(),
       ),
     )
     ..registerFactory<ScanQrScreen>(
