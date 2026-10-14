@@ -202,10 +202,14 @@ void main() {
       addTearDown(serverSocket.close);
       addTearDown(serverSocket.close);
       final seen = <Object?>[];
-      listen(serverSocket, seen.add);
+      final receivedCompleter = Completer<void>();
+      listen(serverSocket, (data) {
+        seen.add(data);
+        if (!receivedCompleter.isCompleted) receivedCompleter.complete();
+      });
 
       await transport.sendControl('{"type":"ping"}');
-      await pumpEventQueue();
+      await receivedCompleter.future.timeout(const Duration(seconds: 3));
 
       expect(seen, contains('{"type":"ping"}'));
     });
@@ -216,11 +220,15 @@ void main() {
       addTearDown(serverSocket.close);
       addTearDown(serverSocket.close);
       final seen = <Object?>[];
-      listen(serverSocket, seen.add);
+      final receivedCompleter = Completer<void>();
+      listen(serverSocket, (data) {
+        seen.add(data);
+        if (!receivedCompleter.isCompleted) receivedCompleter.complete();
+      });
       final payload = Uint8List.fromList(List<int>.filled(1024, 7));
 
       await transport.sendData(payload);
-      await pumpEventQueue();
+      await receivedCompleter.future.timeout(const Duration(seconds: 3));
 
       final received = seen.whereType<Uint8List>().toList();
       expect(received, isNotEmpty);
@@ -283,19 +291,26 @@ void main() {
       addTearDown(serverSocket.close);
       addTearDown(serverSocket.close);
       final received = <int>[];
-      listen(serverSocket, (event) {
-        if (event is Uint8List) received.addAll(event);
-      });
       final chunks = <List<int>>[
         List<int>.filled(16, 1),
         List<int>.filled(16, 2),
         List<int>.filled(16, 3),
       ];
+      final expectedLength = chunks.fold<int>(0, (sum, c) => sum + c.length);
+      final allReceived = Completer<void>();
+      listen(serverSocket, (event) {
+        if (event is Uint8List) {
+          received.addAll(event);
+          if (received.length >= expectedLength && !allReceived.isCompleted) {
+            allReceived.complete();
+          }
+        }
+      });
 
       final result = await transport.sendStream(Stream.fromIterable(chunks));
 
       expect(result.isSuccess, isTrue);
-      await pumpEventQueue();
+      await allReceived.future.timeout(const Duration(seconds: 3));
       expect(received, <int>[...chunks[0], ...chunks[1], ...chunks[2]]);
     });
 
