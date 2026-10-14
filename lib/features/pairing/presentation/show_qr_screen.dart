@@ -51,6 +51,46 @@ class ShowQrScreen extends StatelessWidget {
           listenable: listenable,
           builder: (context, _) {
             final state = controller.state;
+            final receiverError = receiverController?.lastError;
+
+            if (receiverError != null && state is! PairingStateShowingQr) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: context.colors.danger,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Failed to prepare receiver',
+                        style: context.textStyles.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        receiverError.userMessage,
+                        style: context.textStyles.bodyMedium.copyWith(
+                          color: context.colors.onSurfaceMuted,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: () {
+                          controller.reset();
+                          unawaited(receiverController?.startReceiving());
+                        },
+                        child: const Text('Try Again'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
 
             return switch (state) {
               PairingStateInitial() || PairingStateGeneratingQr() =>

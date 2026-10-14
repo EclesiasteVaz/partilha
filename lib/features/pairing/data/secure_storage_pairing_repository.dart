@@ -13,7 +13,10 @@ final class SecureStoragePairingRepository implements PairingRepository {
   SecureStoragePairingRepository({
     FlutterSecureStorage? secureStorage,
     Random? secureRandom,
-  }) : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
+  }) : _secureStorage = secureStorage ??
+           const FlutterSecureStorage(
+             mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+           ),
        _secureRandom = secureRandom ?? Random.secure();
 
   final FlutterSecureStorage _secureStorage;

@@ -90,18 +90,29 @@ class ReceiverController extends ChangeNotifier {
 
     // 3. Generate QR with PairingController
     await pairingController.generateQr(host: host, port: port);
+    if (pairingController.state case PairingStateFailed(:final failure)) {
+      _isStarting = false;
+      _lastError = failure;
+      await transferServer.stop();
+      notifyListeners();
+      return;
+    }
 
     // 4. Start mDNS advertisement if use case is available
     final pairingState = pairingController.state;
     if (startAdvertisingUseCase != null &&
         pairingState is PairingStateShowingQr) {
       final payload = pairingState.payload;
-      await startAdvertisingUseCase!.call(
-        deviceId: payload.deviceId,
-        deviceName: payload.deviceName,
-        port: port,
-        capabilities: const <String, String>{'file-transfer': '1'},
-      );
+      try {
+        await startAdvertisingUseCase!.call(
+          deviceId: payload.deviceId,
+          deviceName: payload.deviceName,
+          port: port,
+          capabilities: const <String, String>{'file-transfer': '1'},
+        );
+      } on Object catch (_) {
+        // mDNS advertising failure is non-fatal: QR carries direct IP/port.
+      }
     }
 
     // 5. Listen to server events

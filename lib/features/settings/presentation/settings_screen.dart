@@ -30,6 +30,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _field = TextEditingController();
+    widget.controller.addListener(_onControllerChanged);
     // Started after the first frame so a failure to read the stored name
     // arrives through the controller's state and can be rendered, rather than
     // throwing during build (§83).
@@ -38,8 +39,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  void _onControllerChanged() {
+    _syncField(widget.controller.state.draftName);
+  }
+
   @override
   void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
     _field.dispose();
     super.dispose();
   }
@@ -50,7 +56,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       listenable: widget.controller,
       builder: (BuildContext context, _) {
         final SettingsState state = widget.controller.state;
-        _syncField(state.draftName);
 
         return Scaffold(
           appBar: AppBar(title: const Text('Settings')),
