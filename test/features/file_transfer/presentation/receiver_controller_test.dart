@@ -169,67 +169,61 @@ void main() {
       },
     );
 
-    test(
-      'tracks transfer offer, bytes progress, and completion',
-      () async {
-        await receiverController.startReceiving();
+    test('tracks transfer offer, bytes progress, and completion', () async {
+      await receiverController.startReceiving();
 
-        expect(receiverController.currentOffer, isNull);
-        expect(receiverController.currentReceivedBytes, 0);
-        expect(receiverController.receivedFiles, isEmpty);
+      expect(receiverController.currentOffer, isNull);
+      expect(receiverController.currentReceivedBytes, 0);
+      expect(receiverController.receivedFiles, isEmpty);
 
-        // 1. Peer sends offer
-        const offer = TransferOffer(
-          id: 'xfer-1',
-          name: 'photo.jpg',
-          sizeInBytes: 1000,
-          meta: {},
-        );
-        transferServer.emitEvent(TransferServerOfferReceived(offer: offer));
-        await Future<void>.delayed(Duration.zero);
+      // 1. Peer sends offer
+      const offer = TransferOffer(
+        id: 'xfer-1',
+        name: 'photo.jpg',
+        sizeInBytes: 1000,
+        meta: {},
+      );
+      transferServer.emitEvent(TransferServerOfferReceived(offer: offer));
+      await Future<void>.delayed(Duration.zero);
 
-        expect(receiverController.currentOffer, equals(offer));
-        expect(receiverController.currentReceivedBytes, 0);
+      expect(receiverController.currentOffer, equals(offer));
+      expect(receiverController.currentReceivedBytes, 0);
 
-        // 2. Peer streams chunks
-        transferServer.emitEvent(
-          TransferServerBytesReceived(
-            transferId: 'xfer-1',
-            bytes: Uint8List(400),
-          ),
-        );
-        await Future<void>.delayed(Duration.zero);
-        expect(receiverController.currentReceivedBytes, 400);
+      // 2. Peer streams chunks
+      transferServer.emitEvent(
+        TransferServerBytesReceived(
+          transferId: 'xfer-1',
+          bytes: Uint8List(400),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(receiverController.currentReceivedBytes, 400);
 
-        transferServer.emitEvent(
-          TransferServerBytesReceived(
-            transferId: 'xfer-1',
-            bytes: Uint8List(600),
-          ),
-        );
-        await Future<void>.delayed(Duration.zero);
-        expect(receiverController.currentReceivedBytes, 1000);
+      transferServer.emitEvent(
+        TransferServerBytesReceived(
+          transferId: 'xfer-1',
+          bytes: Uint8List(600),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(receiverController.currentReceivedBytes, 1000);
 
-        // 3. Transfer finishes
-        const receivedFile = SelectedFile(
-          name: 'photo.jpg',
-          path: '/Downloads/photo.jpg',
-          sizeInBytes: 1000,
-        );
-        transferServer.emitEvent(
-          TransferServerDone(
-            transferId: 'xfer-1',
-            file: receivedFile,
-          ),
-        );
-        await Future<void>.delayed(Duration.zero);
+      // 3. Transfer finishes
+      const receivedFile = SelectedFile(
+        name: 'photo.jpg',
+        path: '/Downloads/photo.jpg',
+        sizeInBytes: 1000,
+      );
+      transferServer.emitEvent(
+        TransferServerDone(transferId: 'xfer-1', file: receivedFile),
+      );
+      await Future<void>.delayed(Duration.zero);
 
-        expect(receiverController.currentOffer, isNull);
-        expect(receiverController.currentReceivedBytes, 0);
-        expect(receiverController.receivedFiles, hasLength(1));
-        expect(receiverController.receivedFiles.first.name, 'photo.jpg');
-      },
-    );
+      expect(receiverController.currentOffer, isNull);
+      expect(receiverController.currentReceivedBytes, 0);
+      expect(receiverController.receivedFiles, hasLength(1));
+      expect(receiverController.receivedFiles.first.name, 'photo.jpg');
+    });
 
     test(
       'stopReceiving stops server, stops mDNS advertising, and resets state',

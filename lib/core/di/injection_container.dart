@@ -264,9 +264,8 @@ void configureDependencies({required AppLogger logger}) {
       () => DartIoTransferServer(
         injectionContainer.resolve<AppLogger>(),
         storageValidation: DartIoStorageValidationService(),
-        destinationDirectoryProvider: () => injectionContainer
-            .resolve<DownloadsDirectoryResolver>()
-            .resolve(),
+        destinationDirectoryProvider: () =>
+            injectionContainer.resolve<DownloadsDirectoryResolver>().resolve(),
         expectedTokenProvider: () =>
             injectionContainer.resolve<PairingController>().state
                 is PairingStateShowingQr

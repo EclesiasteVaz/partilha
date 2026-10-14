@@ -20,12 +20,11 @@ class StartAdvertisingUseCase {
     required int port,
     required Map<String, String> capabilities,
     String? interfaceName,
-  }) =>
-      _discovery.startAdvertising(
-        deviceId: deviceId,
-        deviceName: deviceName,
-        port: port,
-        capabilities: capabilities,
-        interfaceName: interfaceName,
-      );
+  }) => _discovery.startAdvertising(
+    deviceId: deviceId,
+    deviceName: deviceName,
+    port: port,
+    capabilities: capabilities,
+    interfaceName: interfaceName,
+  );
 }

@@ -18,8 +18,7 @@ class FakeDiscoveryService implements DiscoveryService {
     required int port,
     required Map<String, String> capabilities,
     String? interfaceName,
-  }) async =>
-      const Result.success(null);
+  }) async => const Result.success(null);
 
   @override
   Future<Result<void, Failure>> stopAdvertising() async {

@@ -266,8 +266,7 @@ void main() {
           final decoded = ControlMessageCodec.decode(msgJson);
           if (decoded is ControlDecoded &&
               decoded.message.type == ProtocolMessageTypes.transferOffer) {
-            final wireId =
-                decoded.message.payload['wireTransferId'] as String;
+            final wireId = decoded.message.payload['wireTransferId'] as String;
             fakeTransport.emitControl(
               ControlMessage(
                 type: ProtocolMessageTypes.transferAccept,
@@ -280,8 +279,9 @@ void main() {
                 ControlMessage(
                   type: ProtocolMessageTypes.transferComplete,
                   id: 'comp-1',
-                  payload:
-                      TransferCompletePayload(wireTransferId: wireId).toJson(),
+                  payload: TransferCompletePayload(
+                    wireTransferId: wireId,
+                  ).toJson(),
                 ),
               );
             });

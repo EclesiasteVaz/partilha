@@ -142,9 +142,7 @@ final class DartIoWebSocketTransport implements WebSocketTransport {
       return Result.failure(
         NetworkFailure(
           cause: error,
-          context: <String, Object?>{
-            'reason': error.message,
-          },
+          context: <String, Object?>{'reason': error.message},
         ),
       );
     }

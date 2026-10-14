@@ -152,9 +152,7 @@ class ShowQrScreen extends StatelessWidget {
                         ),
                         if (receiverController != null) ...[
                           const SizedBox(height: 24),
-                          _ReceiverStatusSection(
-                            receiver: receiverController!,
-                          ),
+                          _ReceiverStatusSection(receiver: receiverController!),
                         ],
                       ],
                     ),
@@ -229,10 +227,7 @@ class _ReceiverStatusSection extends StatelessWidget {
               color: Colors.green,
             ),
             const SizedBox(width: 8),
-            Text(
-              'Ready to receive files',
-              style: context.textStyles.bodySmall,
-            ),
+            Text('Ready to receive files', style: context.textStyles.bodySmall),
           ],
         ),
       );
@@ -251,7 +246,11 @@ class _ReceiverStatusSection extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.error_outline, color: context.colors.danger, size: 20),
+                Icon(
+                  Icons.error_outline,
+                  color: context.colors.danger,
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -288,11 +287,12 @@ class _ReceiverStatusSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   LinearProgressIndicator(
-                    value: activeOffer.sizeInBytes != null &&
+                    value:
+                        activeOffer.sizeInBytes != null &&
                             activeOffer.sizeInBytes! > 0
                         ? (receiver.currentReceivedBytes /
-                                activeOffer.sizeInBytes!)
-                            .clamp(0.0, 1.0)
+                                  activeOffer.sizeInBytes!)
+                              .clamp(0.0, 1.0)
                         : null,
                   ),
                   const SizedBox(height: 6),

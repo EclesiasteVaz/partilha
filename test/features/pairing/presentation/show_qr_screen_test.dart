@@ -186,9 +186,7 @@ void main() {
     tester,
   ) async {
     pairingController.setState(
-      const PairingState.failed(
-        failure: PairingFailure.invalidPayload,
-      ),
+      const PairingState.failed(failure: PairingFailure.invalidPayload),
     );
 
     await pumpScreen(tester);

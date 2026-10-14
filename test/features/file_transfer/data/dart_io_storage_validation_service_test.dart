@@ -19,14 +19,17 @@ void main() {
   });
 
   group('DartIoStorageValidationService', () {
-    test('succeeds and reports hasEnoughSpace true for valid writable directory', () async {
-      final result = await service.check(
-        path: tempDir.path,
-        sizeInBytes: 1024 * 1024 * 10, // 10 MB
-      );
+    test(
+      'succeeds and reports hasEnoughSpace true for valid writable directory',
+      () async {
+        final result = await service.check(
+          path: tempDir.path,
+          sizeInBytes: 1024 * 1024 * 10, // 10 MB
+        );
 
-      expect(result.isSuccess, isTrue);
-      expect(result.valueOrNull?.hasEnoughSpace, isTrue);
-    });
+        expect(result.isSuccess, isTrue);
+        expect(result.valueOrNull?.hasEnoughSpace, isTrue);
+      },
+    );
   });
 }

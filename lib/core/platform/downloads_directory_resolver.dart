@@ -22,13 +22,17 @@ class SystemDownloadsDirectoryResolver implements DownloadsDirectoryResolver {
       return _cached!;
     }
 
-    final isAndroid = platformOverride == 'android' ||
+    final isAndroid =
+        platformOverride == 'android' ||
         (platformOverride == null && Platform.isAndroid);
-    final isMacOS = platformOverride == 'macos' ||
+    final isMacOS =
+        platformOverride == 'macos' ||
         (platformOverride == null && Platform.isMacOS);
-    final isLinux = platformOverride == 'linux' ||
+    final isLinux =
+        platformOverride == 'linux' ||
         (platformOverride == null && Platform.isLinux);
-    final isWindows = platformOverride == 'windows' ||
+    final isWindows =
+        platformOverride == 'windows' ||
         (platformOverride == null && Platform.isWindows);
 
     Directory? resolved;
