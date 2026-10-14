@@ -3,8 +3,7 @@ import 'dart:io';
 import 'package:get_it/get_it.dart';
 import 'package:partilha/core/logging/logging.dart';
 import 'package:partilha/core/network/network.dart';
-import 'package:partilha/core/platform/android_multicast_lock.dart';
-import 'package:partilha/core/platform/multicast_lock.dart';
+import 'package:partilha/core/platform/platform.dart';
 import 'package:partilha/features/discovery/application/application.dart';
 import 'package:partilha/features/discovery/data/data.dart';
 import 'package:partilha/features/discovery/domain/domain.dart';
@@ -258,11 +257,16 @@ void configureDependencies({required AppLogger logger}) {
     ..registerLazySingleton<DeviceAddressResolver>(
       NetworkInterfaceDeviceAddressResolver.new,
     )
+    ..registerLazySingleton<DownloadsDirectoryResolver>(
+      SystemDownloadsDirectoryResolver.new,
+    )
     ..registerLazySingleton<TransferServer>(
       () => DartIoTransferServer(
         injectionContainer.resolve<AppLogger>(),
-        storageValidation: null,
-        destinationDirectoryProvider: null,
+        storageValidation: DartIoStorageValidationService(),
+        destinationDirectoryProvider: () => injectionContainer
+            .resolve<DownloadsDirectoryResolver>()
+            .resolve(),
         expectedTokenProvider: () =>
             injectionContainer.resolve<PairingController>().state
                 is PairingStateShowingQr

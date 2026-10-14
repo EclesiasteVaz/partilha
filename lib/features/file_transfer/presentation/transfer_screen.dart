@@ -169,6 +169,33 @@ class _DestinationCard extends StatelessWidget {
           '${destination.address}:${destination.port}',
           style: context.textStyles.bodySmall,
         ),
+        trailing: destination.token != null
+            ? Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle, size: 14, color: Colors.green),
+                    SizedBox(width: 4),
+                    Text(
+                      'Paired',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : null,
       ),
     );
   }

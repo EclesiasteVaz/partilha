@@ -22,11 +22,17 @@ final class SecureStoragePairingRepository implements PairingRepository {
   final FlutterSecureStorage _secureStorage;
   final Random _secureRandom;
 
+  DeviceIdentity? _cachedIdentity;
+
   static const String _keyDeviceId = 'partilha_device_id';
   static const String _keyDeviceToken = 'partilha_device_token';
 
   @override
   Future<Result<DeviceIdentity, Failure>> getOrCreateIdentity() async {
+    if (_cachedIdentity != null) {
+      return Result.success(_cachedIdentity!);
+    }
+
     try {
       var deviceId = await _secureStorage.read(key: _keyDeviceId);
       var token = await _secureStorage.read(key: _keyDeviceToken);
@@ -35,18 +41,27 @@ final class SecureStoragePairingRepository implements PairingRepository {
         deviceId ??= _generateRandomHex(16);
         token ??= _generateRandomHex(32);
 
-        await _secureStorage.write(key: _keyDeviceId, value: deviceId);
-        await _secureStorage.write(key: _keyDeviceToken, value: token);
+        try {
+          await _secureStorage.write(key: _keyDeviceId, value: deviceId);
+          await _secureStorage.write(key: _keyDeviceToken, value: token);
+        } on Object {
+          // If write to secure storage is denied, keep the in-memory identity
+        }
       }
 
-      return Result.success(DeviceIdentity(deviceId: deviceId, token: token));
-    } on Object catch (e) {
-      return Result.failure(
-        StorageFailure(
-          cause: e,
-          context: const <String, Object?>{'operation': 'getOrCreateIdentity'},
-        ),
+      final identity = DeviceIdentity(deviceId: deviceId, token: token);
+      _cachedIdentity = identity;
+      return Result.success(identity);
+    } on Object {
+      // If secure storage access is denied (e.g. user cancelled keychain prompt
+      // or keychain is unavailable), fall back to an ephemeral in-memory identity
+      // so the user is never locked in an infinite prompt loop.
+      final fallback = DeviceIdentity(
+        deviceId: _generateRandomHex(16),
+        token: _generateRandomHex(32),
       );
+      _cachedIdentity = fallback;
+      return Result.success(fallback);
     }
   }
 

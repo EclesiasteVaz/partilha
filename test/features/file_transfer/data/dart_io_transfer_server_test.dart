@@ -197,10 +197,14 @@ void main() {
         ),
       );
 
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      final partialFile = File('${tempDir.path}/partial.txt');
+      var iterations = 0;
+      while (partialFile.existsSync() && iterations < 20) {
+        await Future<void>.delayed(const Duration(milliseconds: 25));
+        iterations++;
+      }
 
       // Must have closed socket or sent error, and partial file must NOT exist!
-      final partialFile = File('${tempDir.path}/partial.txt');
       expect(partialFile.existsSync(), isFalse);
       expect(responses.any((m) => m.isError), isTrue);
       await ws.close();

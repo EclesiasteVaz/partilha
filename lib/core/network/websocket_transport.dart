@@ -12,7 +12,7 @@ final class TransportTarget {
   const TransportTarget({
     required this.host,
     required this.port,
-    required this.certificateFingerprint,
+    this.certificateFingerprint,
   });
 
   /// The address of the peer, as announced by the receiver.
@@ -21,8 +21,8 @@ final class TransportTarget {
   /// The TCP port the receiver is listening on.
   final int port;
 
-  /// The only certificate that will be accepted.
-  final CertificateFingerprint certificateFingerprint;
+  /// The only certificate that will be accepted when TLS is active.
+  final CertificateFingerprint? certificateFingerprint;
 
   @override
   String toString() => 'TransportTarget($host:$port)';

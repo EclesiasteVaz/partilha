@@ -49,20 +49,26 @@ final class DartIoWebSocketTransport implements WebSocketTransport {
     }
 
     final fingerprint = target.certificateFingerprint;
-    final client = HttpClient(context: SecurityContext())
-      // An empty trust store, deliberately. Platform roots must not be able to
-      // vouch for a device, and with nothing trusted the callback below is
-      // reached for every connection instead of only for certificates some
-      // platform happened to reject.
-      ..badCertificateCallback = (certificate, _, _) =>
-          _matchesPin(certificate, fingerprint);
+    final scheme = fingerprint != null ? 'wss' : 'ws';
+    final HttpClient? client;
+    if (fingerprint != null) {
+      client = HttpClient(context: SecurityContext())
+        // An empty trust store, deliberately. Platform roots must not be able to
+        // vouch for a device, and with nothing trusted the callback below is
+        // reached for every connection instead of only for certificates some
+        // platform happened to reject.
+        ..badCertificateCallback = (certificate, _, _) =>
+            _matchesPin(certificate, fingerprint);
+    } else {
+      client = null;
+    }
 
     // Declared outside the try so that a socket obtained but not yet adopted is
     // still closed when a later step fails.
     WebSocket? websocket;
     try {
       websocket = await WebSocket.connect(
-        'wss://${target.host}:${target.port}/',
+        '$scheme://${target.host}:${target.port}/',
         customClient: client,
       );
 
@@ -91,7 +97,7 @@ final class DartIoWebSocketTransport implements WebSocketTransport {
       return const Result.success(null);
     } on HandshakeException catch (error) {
       await websocket?.close();
-      client.close(force: true);
+      client?.close(force: true);
       // Almost always a pin mismatch: the socket connected but the certificate
       // did not verify. Reporting it as an unreachable peer would hide a
       // security-relevant event behind a retry.
@@ -110,7 +116,7 @@ final class DartIoWebSocketTransport implements WebSocketTransport {
       );
     } on SocketException catch (error) {
       await websocket?.close();
-      client.close(force: true);
+      client?.close(force: true);
       _logger.warning(
         'Transport could not connect',
         context: <String, Object?>{'host': target.host, 'port': target.port},
@@ -122,6 +128,22 @@ final class DartIoWebSocketTransport implements WebSocketTransport {
           context: <String, Object?>{
             'reason': error.message,
             if (error.osError != null) 'osError': error.osError!.message,
+          },
+        ),
+      );
+    } on WebSocketException catch (error) {
+      await websocket?.close();
+      client?.close(force: true);
+      _logger.warning(
+        'WebSocket error during connect',
+        context: <String, Object?>{'host': target.host, 'port': target.port},
+        error: error,
+      );
+      return Result.failure(
+        NetworkFailure(
+          cause: error,
+          context: <String, Object?>{
+            'reason': error.message,
           },
         ),
       );

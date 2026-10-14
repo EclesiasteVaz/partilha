@@ -239,4 +239,61 @@ void main() {
       );
     },
   );
+
+  test(
+    'connects when transport is disconnected and certificateFingerprint is null',
+    () async {
+      fakeTransport.connected = false;
+      const destination = TransferDestination(
+        deviceId: 'receiver-plain',
+        deviceName: 'Plain Receiver',
+        address: '127.0.0.1',
+        port: 8080,
+      );
+
+      final request = TransferRequest(
+        id: 'req-unpinned',
+        destination: destination,
+        file: SelectedFile(
+          name: 'sample.txt',
+          path: testFile.path,
+          sizeInBytes: testFile.lengthSync(),
+        ),
+      );
+
+      Timer.periodic(const Duration(milliseconds: 10), (timer) {
+        for (final msgJson in fakeTransport.sentControlMessages) {
+          final decoded = ControlMessageCodec.decode(msgJson);
+          if (decoded is ControlDecoded &&
+              decoded.message.type == ProtocolMessageTypes.transferOffer) {
+            final wireId =
+                decoded.message.payload['wireTransferId'] as String;
+            fakeTransport.emitControl(
+              ControlMessage(
+                type: ProtocolMessageTypes.transferAccept,
+                id: 'accept-1',
+                payload: TransferAcceptPayload(wireTransferId: wireId).toJson(),
+              ),
+            );
+            Future.delayed(const Duration(milliseconds: 20), () {
+              fakeTransport.emitControl(
+                ControlMessage(
+                  type: ProtocolMessageTypes.transferComplete,
+                  id: 'comp-1',
+                  payload:
+                      TransferCompletePayload(wireTransferId: wireId).toJson(),
+                ),
+              );
+            });
+            timer.cancel();
+            break;
+          }
+        }
+      });
+
+      final events = await repository.send(request).toList();
+      expect(fakeTransport.isConnected, isTrue);
+      expect(events.last.bytesTransferred, testFile.lengthSync());
+    },
+  );
 }

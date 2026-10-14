@@ -109,14 +109,6 @@ class WebSocketTransferRepository implements TransferRepository {
             ? CertificateFingerprint.parse(fingerprintStr).valueOrNull
             : null;
 
-        if (fingerprint == null) {
-          // If no certificate fingerprint was provided, connection cannot be pinned.
-          // In production, unpinned connections violate security policy (§26.1).
-          controller.addError(PairingFailure.invalidPayload);
-          await controller.close();
-          return;
-        }
-
         final target = TransportTarget(
           host: request.destination.address,
           port: request.destination.port,

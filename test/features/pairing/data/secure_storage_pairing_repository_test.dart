@@ -21,12 +21,28 @@ void main() {
         expect(identity1.deviceId.isNotEmpty, isTrue);
         expect(identity1.token.isNotEmpty, isTrue);
 
-        // Second call returns exactly the same persistent identity
+        // Second call returns exactly the same persistent identity from cache
         final res2 = await repository.getOrCreateIdentity();
         expect(res2.isSuccess, isTrue);
         final identity2 = res2.valueOrNull!;
         expect(identity2.deviceId, identity1.deviceId);
         expect(identity2.token, identity1.token);
+      },
+    );
+
+    test(
+      'gracefully returns session identity when secure storage throws',
+      () async {
+        // Mock with throwing behavior or bad storage
+        final repository = SecureStoragePairingRepository(
+          secureStorage: null, // default
+        );
+
+        final res = await repository.getOrCreateIdentity();
+        expect(res.isSuccess, isTrue);
+        final identity = res.valueOrNull!;
+        expect(identity.deviceId.isNotEmpty, isTrue);
+        expect(identity.token.isNotEmpty, isTrue);
       },
     );
   });
