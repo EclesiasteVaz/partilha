@@ -9,10 +9,16 @@ abstract interface class DownloadsDirectoryResolver {
 
 /// Project-owned implementation of [DownloadsDirectoryResolver].
 class SystemDownloadsDirectoryResolver implements DownloadsDirectoryResolver {
-  SystemDownloadsDirectoryResolver({this.platformOverride});
+  SystemDownloadsDirectoryResolver({
+    this.platformOverride,
+    this.androidCandidatesOverride,
+  });
 
   /// Allows unit testing platform resolution on different environments.
   final String? platformOverride;
+
+  /// Allows unit testing candidate fallback sequence on Android.
+  final List<String>? androidCandidatesOverride;
 
   Directory? _cached;
 
@@ -38,13 +44,8 @@ class SystemDownloadsDirectoryResolver implements DownloadsDirectoryResolver {
     Directory? resolved;
 
     if (isAndroid) {
-      final candidates = <String>[
-        '/storage/emulated/0/Download',
-        '/sdcard/Download',
-        if (Platform.environment['EXTERNAL_STORAGE'] != null)
-          '${Platform.environment['EXTERNAL_STORAGE']}/Download',
-        '/storage/emulated/0/Android/data/com.example.partilha/files/Download',
-      ];
+      final candidates =
+          androidCandidatesOverride ?? _defaultAndroidCandidates();
 
       for (final candidate in candidates) {
         final dir = Directory(candidate);
@@ -74,6 +75,32 @@ class SystemDownloadsDirectoryResolver implements DownloadsDirectoryResolver {
     resolved ??= Directory.systemTemp;
     _cached = resolved;
     return resolved;
+  }
+
+  List<String> _defaultAndroidCandidates() {
+    String packageName = 'com.partilha.partilha';
+    try {
+      final cmd = File('/proc/self/cmdline');
+      if (cmd.existsSync()) {
+        final text = cmd.readAsStringSync().replaceAll('\x00', '').trim();
+        if (text.isNotEmpty) {
+          packageName = text;
+        }
+      }
+    } on Object catch (_) {}
+
+    return <String>[
+      '/storage/emulated/0/Download',
+      '/sdcard/Download',
+      if (Platform.environment['EXTERNAL_STORAGE'] != null)
+        '${Platform.environment['EXTERNAL_STORAGE']}/Download',
+      '/storage/emulated/0/Android/data/$packageName/files/Download',
+      '/storage/emulated/0/Android/data/$packageName/files',
+      '/sdcard/Android/data/$packageName/files/Download',
+      '/data/user/0/$packageName/app_flutter/Download',
+      '/data/user/0/$packageName/files/Download',
+      '/data/data/$packageName/files/Download',
+    ];
   }
 
   bool _isWritable(Directory dir) {

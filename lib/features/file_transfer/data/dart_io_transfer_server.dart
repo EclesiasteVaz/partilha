@@ -260,9 +260,8 @@ final class DartIoTransferServer implements TransferServer {
                       sizeInBytes: offer.size,
                     );
                     final status = spaceCheck.valueOrNull;
-                    if (spaceCheck.isSuccess &&
-                        status != null &&
-                        !status.hasEnoughSpace) {
+                    if (spaceCheck.isFailure ||
+                        (status != null && !status.hasEnoughSpace)) {
                       sendControlMessage(
                         ControlMessage(
                           type: ProtocolMessageTypes.transferReject,
@@ -277,6 +276,13 @@ final class DartIoTransferServer implements TransferServer {
                         ControlMessageCodec.errorMessage(
                           id: msg.id,
                           code: ProtocolErrorCode.insufficientStorage,
+                        ),
+                      );
+                      _events.add(
+                        TransferServerError(
+                          failure:
+                              spaceCheck.errorOrNull ??
+                              StorageFailure.insufficientSpace,
                         ),
                       );
                       return;
@@ -369,46 +375,64 @@ final class DartIoTransferServer implements TransferServer {
               return;
             }
 
-            activeSink!.add(data);
-            bytesReceived += data.length;
-
-            _events.add(
-              TransferServerBytesReceived(
-                transferId: activeWireTransferId!,
-                bytes: Uint8List.fromList(data),
-              ),
-            );
-
-            if (activeTotalBytes != null &&
-                bytesReceived >= activeTotalBytes!) {
-              await activeSink!.flush();
-              await activeSink!.close();
-              activeSink = null;
-              isStreaming = false;
-
-              sendControlMessage(
-                ControlMessage(
-                  type: ProtocolMessageTypes.transferComplete,
-                  id: 'complete_${DateTime.now().millisecondsSinceEpoch}',
-                  payload: TransferCompletePayload(
-                    wireTransferId: activeWireTransferId!,
-                  ).toJson(),
-                ),
-              );
+            try {
+              activeSink!.add(data);
+              bytesReceived += data.length;
 
               _events.add(
-                TransferServerDone(
+                TransferServerBytesReceived(
                   transferId: activeWireTransferId!,
-                  file: SelectedFile(
-                    name: activeFileName!,
-                    path: activeFile!.path,
-                    sizeInBytes: bytesReceived,
-                  ),
+                  bytes: Uint8List.fromList(data),
                 ),
               );
 
+              if (activeTotalBytes != null &&
+                  bytesReceived >= activeTotalBytes!) {
+                await activeSink!.flush();
+                await activeSink!.close();
+                activeSink = null;
+                isStreaming = false;
+
+                sendControlMessage(
+                  ControlMessage(
+                    type: ProtocolMessageTypes.transferComplete,
+                    id: 'complete_${DateTime.now().millisecondsSinceEpoch}',
+                    payload: TransferCompletePayload(
+                      wireTransferId: activeWireTransferId!,
+                    ).toJson(),
+                  ),
+                );
+
+                _events.add(
+                  TransferServerDone(
+                    transferId: activeWireTransferId!,
+                    file: SelectedFile(
+                      name: activeFileName!,
+                      path: activeFile!.path,
+                      sizeInBytes: bytesReceived,
+                    ),
+                  ),
+                );
+
+                activeWireTransferId = null;
+                activeFile = null;
+              }
+            } on Object catch (e) {
+              _logger.warning('Failed writing data chunk to storage: $e');
+              await cleanupPartialFile();
+              isStreaming = false;
               activeWireTransferId = null;
               activeFile = null;
+              _events.add(
+                TransferServerError(failure: StorageFailure.writeFailed),
+              );
+              sendControlMessage(
+                ControlMessageCodec.errorMessage(
+                  id: 'err_write',
+                  code: ProtocolErrorCode.insufficientStorage,
+                  message: 'Write failed: $e',
+                ),
+              );
             }
           }
         },

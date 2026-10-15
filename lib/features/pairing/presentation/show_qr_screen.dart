@@ -345,10 +345,14 @@ class _ReceiverStatusSection extends StatelessWidget {
                   style: context.textStyles.bodyMedium,
                 ),
                 subtitle: Text(
-                  _formatBytes(file.sizeInBytes),
+                  file.path.isNotEmpty
+                      ? '${_formatBytes(file.sizeInBytes)} • ${file.path}'
+                      : _formatBytes(file.sizeInBytes),
                   style: context.textStyles.bodySmall.copyWith(
                     color: context.colors.onSurfaceMuted,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
