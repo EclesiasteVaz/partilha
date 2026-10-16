@@ -84,7 +84,7 @@ jobs:
 
   publish-release:
     name: Publish GitHub Release
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     needs: [build-android, build-macos]
     runs-on: ubuntu-latest
     steps:
@@ -105,13 +105,14 @@ jobs:
       - name: Create GitHub Release & Upload Binaries
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
           files: |
             release-assets/partilha-android-universal.apk
             release-assets/partilha-macos.app.zip
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '0.0.') }}
+          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '0.0.') || contains(inputs.tag_name, '0.0.') }}
           body: |
-            ## Partilha ${{ github.ref_name }} (Beta)
+            ## Partilha ${{ github.event.inputs.tag_name || github.ref_name }} (Beta)
 
             Local device-to-device file sharing between **Android** and **macOS** over your local network.
 
