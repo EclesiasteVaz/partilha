@@ -1301,8 +1301,8 @@ counterpart of the table in `README.md`, and both must be updated together.
 
 | Platform | Folder | Status | Built / tested |
 |---|---|---|---|
-| Android | `android/` | Primary target; Discovery gated on hardware | APK builds; never run on a device |
-| macOS | `macos/` | Primary target; Settings implemented | Debug build launched; mDNS spike run locally |
+| Android | `android/` | Primary target — Working in Beta (`v0.0.1`) | APK built & verified on physical Android device (Send/Receive, QR scan, `MediaStore.Downloads`) |
+| macOS | `macos/` | Primary target — Working in Beta (`v0.0.1`) | Release & debug builds verified on macOS (Send/Receive, QR generation, mDNS advertisement, Downloads) |
 | iOS | `ios/` | Scaffold only | No |
 | Windows | `windows/` | Scaffold only | No |
 | Linux | `linux/` | Scaffold only | No |
@@ -1335,16 +1335,12 @@ for a working platform. To keep that mistake detectable:
 - limitations are recorded in `features/<feature>/FEATURE.md`, never inferred
   from the existence of a folder.
 
-Current state, stated precisely: **Settings is the only implemented feature.** It
-runs on macOS — the debug build launches, renders the device-name screen, and
-creates its SQLite database under the app sandbox in
-`Documents/partilha.db` with `user_version = 1` and the `settings` key/value
-table. Discovery, pairing and transfer are unimplemented on every platform.
-
-mDNS has been validated on macOS on a single machine only: the local probes in
-`tool/spike/mdns_spike.dart` pass and `dns-sd` resolves the advertisement, but a
-second device is still required. `features/discovery/FEATURE.md` §34 gates the
-Discovery UI on the Android hardware run.
+Current state, stated precisely: **Both Android and macOS are working end-to-end
+in `v0.0.1` Beta** (see `docs/show-case.mp4`). Settings, mDNS discovery and
+advertisement, QR-code pairing, and streaming WebSocket file transfer
+(Android ↔ macOS) have been verified on physical devices. Known beta items
+(such as macOS Keychain prompts on ad-hoc signed builds and peer disconnection
+state polish) are tracked in `README.md`.
 
 ---
 

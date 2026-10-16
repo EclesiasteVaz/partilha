@@ -1,0 +1,123 @@
+name: Release Artifacts
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Optional tag name when triggered manually (e.g. v0.0.1-beta)'
+        required: false
+        default: 'v0.0.1-beta'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.6
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Build Android Release APK
+        run: flutter build apk --release
+
+      - name: Rename Android APK
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk partilha-android-universal.apk
+
+      - name: Upload Android Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: partilha-android-apk
+          path: partilha-android-universal.apk
+          retention-days: 30
+
+  build-macos:
+    name: Build macOS App
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.6
+          cache: true
+
+      - name: Enable macOS desktop
+        run: flutter config --enable-macos-desktop
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Build macOS Release App
+        run: flutter build macos --release
+
+      - name: Package macOS App (.zip)
+        run: |
+          cd build/macos/Build/Products/Release
+          ditto -c -k --sequesterRsrc --keepParent partilha.app "${GITHUB_WORKSPACE}/partilha-macos.app.zip"
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: partilha-macos-app
+          path: partilha-macos.app.zip
+          retention-days: 30
+
+  publish-release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-android, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Android APK Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: partilha-android-apk
+          path: release-assets
+
+      - name: Download macOS App Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: partilha-macos-app
+          path: release-assets
+
+      - name: Create GitHub Release & Upload Binaries
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-assets/partilha-android-universal.apk
+            release-assets/partilha-macos.app.zip
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, 'v0.0.') }}
+          body: |
+            ## Partilha ${{ github.ref_name }} (Beta)
+
+            Local device-to-device file sharing between **Android** and **macOS** over your local network.
+
+            ### 📦 Downloads
+            - **Android**: Download `partilha-android-universal.apk` and install it on your Android device.
+            - **macOS**: Download `partilha-macos.app.zip`, extract `partilha.app`, and move it to `/Applications` (right-click → **Open** on first launch since the build is ad-hoc signed).
+
+            ### ⚠️ Known Beta Issues (Contributions Welcome!)
+            - **macOS Keychain Prompts**: On ad-hoc signed builds, macOS may prompt up to 4 times for the Keychain password when reading/writing the local device identity token.
+            - **Session Disconnection & Reconnection**: Peer disconnection state notifications and session teardown UX are actively being refined.

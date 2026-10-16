@@ -67,3 +67,10 @@ jobs:
       # the platform status table exists to prevent.
       - name: Build Android debug APK
         run: flutter build apk --debug
+
+      - name: Upload Android debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: partilha-android-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14

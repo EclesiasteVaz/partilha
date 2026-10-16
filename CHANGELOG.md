@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.1] - 2026-10-16
+
 ### Added
 
+- **End-to-End File Transfer (`features/file_transfer`, `features/pairing`, `features/discovery`)**:
+  Full working beta of local device-to-device file sharing between **Android** and **macOS**:
+  - **QR Pairing** (`ShowQrScreen`, `ScanQrScreen`, `PairingController`, `JsonQrCodeService`, `SecureStoragePairingRepository`): receiver generates a pairing QR carrying host, port, device ID, device name, and session token; sender scans via `mobile_scanner` and establishes an authenticated WebSocket session.
+  - **Transfer Server & Sender Repository** (`DartIoTransferServer`, `WebSocketTransferRepository`, `ReceiverController`): streaming binary chunks (<= 64 KiB) with control frames separated on text frames, real-time progress and speed reporting, storage space validation (`DartIoStorageValidationService`), and deterministic duplicate filename resolution (`resolveFilenameConflict`).
+  - **System Downloads & File Viewer Integration** (`DownloadsDirectoryResolver`, `ReceivedFileService`, `MainActivity.kt`): saves received files to `~/Downloads` on macOS and publishes received files into Android's public `Downloads` collection via `MediaStore.Downloads` (API 29+) and `MediaScannerConnection`. Tapping a received file item opens it directly in the OS default viewer (`Intent.ACTION_VIEW` with fallback to `ACTION_VIEW_DOWNLOADS` on Android, and `open` on macOS).
+  - **Release CI/CD Pipeline** (`.github/workflows/release.yml`): automated GitHub Actions workflow building `partilha-android-universal.apk` and `partilha-macos.app.zip` and publishing them to GitHub Releases on `v*` tags.
 - **Settings: device name** (`features/settings`): the first implemented screen.
   A user-defined device name, validated as a `DeviceName` value object
   (non-empty, at most 64 characters, no control characters), persisted through
@@ -295,27 +303,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `OPEN — APPROVAL REQUIRED`, including the warning that `wss://` with an
   unpinned self-signed certificate does not by itself provide authentication.
 
-### Known Limitations
+### Known Limitations (`v0.0.1` Beta)
 
-- **Nothing is implemented.** The repository contains the generated Flutter
-  scaffold, the complete architecture and feature specification, and the core
-  error, result and logging primitives. No feature screen or flow exists.
-- **No platform is supported.** Android and macOS are the approved targets but
-  have no implementation yet. `ios/`, `linux/`, `windows/` and `web/` contain
-  unmodified scaffold only; they are neither built nor tested. See
-  `docs/decisions/0005-estado-das-plataformas.md`.
-- Discovery is blocked pending an mDNS provider validation spike.
-- File transfer is blocked pending the wire-framing and transport-encryption
-  decisions.
+- **macOS Keychain Prompts on Ad-Hoc Signed Builds**: On unsigned/ad-hoc signed macOS builds, macOS Keychain may prompt up to 4 times when reading/writing the local device identity and token on first access.
+- **Session Disconnection UX**: Peer disconnection state notifications and session teardown flows are functional but undergoing UX refinement.
+- **Platform Scope**: Android and macOS are verified in `v0.0.1` Beta. `ios/`, `linux/`, `windows/` and `web/` contain unmodified scaffold only; they are neither built nor tested. See `docs/decisions/0005-estado-das-plataformas.md`.
 
-[Unreleased]: https://github.com/partilha/partilha/compare/v0.0.0...HEAD
-### Added
-- T1 — Deterministic filename conflict policy in domain (`resolveFilenameConflict`) with comprehensive unit tests; exported via `domain/domain.dart`.
-- T2 — Transfer speed measured in `TransferQueue` (byte-accurate, trailing 3s window, rounded) exposed as `TransferItem.speedBytesPerSecond`, cleared on completion/cancel/retry.
-
-### Changed
-- `TransferItem`: added `speedBytesPerSecond`, `withSpeed`, updated equality/hash/toString and carried through transitions/progress.
-
-### Documentation
-- Updated README and discovery/FEATURE.md to reflect implemented state (Roadmap, Status, discovery current status).
+[Unreleased]: https://github.com/EclesiasteVaz/partilha/compare/v0.0.1...HEAD
+[0.0.1]: https://github.com/EclesiasteVaz/partilha/releases/tag/v0.0.1
 
