@@ -4,12 +4,13 @@ on:
   push:
     tags:
       - 'v*'
+      - '[0-9]*'
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Optional tag name when triggered manually (e.g. v0.0.1-beta)'
+        description: 'Optional tag name when triggered manually (e.g. v0.0.2)'
         required: false
-        default: 'v0.0.1-beta'
+        default: 'v0.0.2'
 
 permissions:
   contents: write
@@ -83,7 +84,7 @@ jobs:
 
   publish-release:
     name: Publish GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/')
     needs: [build-android, build-macos]
     runs-on: ubuntu-latest
     steps:
@@ -108,7 +109,7 @@ jobs:
             release-assets/partilha-android-universal.apk
             release-assets/partilha-macos.app.zip
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, 'v0.0.') }}
+          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '0.0.') }}
           body: |
             ## Partilha ${{ github.ref_name }} (Beta)
 
