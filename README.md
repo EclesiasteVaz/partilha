@@ -15,7 +15,7 @@ The project focuses on direct device-to-device transfers, local network discover
 Watch Partilha transferring files between Android and macOS in real time:
 
 <p align="center">
-  <video src="docs/show-case.mp4" controls width="720">
+  <video src="./docs/show-case.mp4" controls width="720">
     Your browser does not support embedded video. Watch the showcase directly at <a href="docs/show-case.mp4">docs/show-case.mp4</a>.
   </video>
 </p>
