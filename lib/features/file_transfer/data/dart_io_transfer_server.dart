@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:partilha/core/errors/failure.dart';
 import 'package:partilha/core/logging/app_logger.dart';
 import 'package:partilha/core/network/transport_frame.dart';
+import 'package:partilha/core/platform/platform.dart';
 import 'package:partilha/core/protocol/protocol.dart';
 import 'package:partilha/core/result/result.dart';
 import 'package:partilha/features/file_transfer/domain/domain.dart';
@@ -26,12 +27,14 @@ final class DartIoTransferServer implements TransferServer {
     this.storageValidation,
     this.destinationDirectoryProvider,
     this.expectedTokenProvider,
+    this.receivedFileService,
   });
 
   final AppLogger _logger;
   final StorageValidationService? storageValidation;
   final Directory Function()? destinationDirectoryProvider;
   final String? Function()? expectedTokenProvider;
+  final ReceivedFileService? receivedFileService;
 
   final StreamController<TransferServerEvent> _events =
       StreamController<TransferServerEvent>.broadcast();
@@ -393,6 +396,15 @@ final class DartIoTransferServer implements TransferServer {
                 activeSink = null;
                 isStreaming = false;
 
+                final String stagedPath = activeFile!.path;
+                final String stagedName = activeFileName!;
+                final String finalPath = receivedFileService != null
+                    ? await receivedFileService!.finalizeReceivedFile(
+                        sourcePath: stagedPath,
+                        fileName: stagedName,
+                      )
+                    : stagedPath;
+
                 sendControlMessage(
                   ControlMessage(
                     type: ProtocolMessageTypes.transferComplete,
@@ -407,8 +419,8 @@ final class DartIoTransferServer implements TransferServer {
                   TransferServerDone(
                     transferId: activeWireTransferId!,
                     file: SelectedFile(
-                      name: activeFileName!,
-                      path: activeFile!.path,
+                      name: stagedName,
+                      path: finalPath,
                       sizeInBytes: bytesReceived,
                     ),
                   ),

@@ -260,6 +260,9 @@ void configureDependencies({required AppLogger logger}) {
     ..registerLazySingleton<DownloadsDirectoryResolver>(
       SystemDownloadsDirectoryResolver.new,
     )
+    ..registerLazySingleton<ReceivedFileService>(
+      PlatformReceivedFileService.new,
+    )
     ..registerLazySingleton<TransferServer>(
       () => DartIoTransferServer(
         injectionContainer.resolve<AppLogger>(),
@@ -274,6 +277,7 @@ void configureDependencies({required AppLogger logger}) {
                   .payload
                   .token
             : null,
+        receivedFileService: injectionContainer.resolve<ReceivedFileService>(),
       ),
     )
     ..registerLazySingleton<ReceiverController>(
@@ -286,6 +290,7 @@ void configureDependencies({required AppLogger logger}) {
             .resolve<StartAdvertisingUseCase>(),
         stopAdvertisingUseCase: injectionContainer
             .resolve<StopAdvertisingUseCase>(),
+        receivedFileService: injectionContainer.resolve<ReceivedFileService>(),
       ),
     )
     ..registerLazySingleton<PairingRepository>(

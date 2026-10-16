@@ -334,6 +334,19 @@ class _ReceiverStatusSection extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 6),
               child: ListTile(
                 dense: true,
+                onTap: () async {
+                  final messenger = ScaffoldMessenger.maybeOf(context);
+                  final opened = await receiver.openReceivedFile(file);
+                  if (!opened && messenger != null) {
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Could not open this file on this device.',
+                        ),
+                      ),
+                    );
+                  }
+                },
                 leading: const Icon(
                   Icons.check_circle,
                   color: Colors.green,
@@ -353,6 +366,11 @@ class _ReceiverStatusSection extends StatelessWidget {
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
+                ),
+                trailing: Icon(
+                  Icons.open_in_new,
+                  size: 18,
+                  color: context.colors.onSurfaceMuted,
                 ),
               ),
             ),

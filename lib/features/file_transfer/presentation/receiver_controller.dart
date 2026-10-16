@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:partilha/core/errors/failure.dart';
 import 'package:partilha/core/network/network.dart';
+import 'package:partilha/core/platform/platform.dart';
 import 'package:partilha/features/discovery/application/application.dart';
 import 'package:partilha/features/file_transfer/domain/domain.dart';
 import 'package:partilha/features/pairing/presentation/pairing_controller.dart';
@@ -22,6 +23,7 @@ class ReceiverController extends ChangeNotifier {
     required this.pairingController,
     this.startAdvertisingUseCase,
     this.stopAdvertisingUseCase,
+    this.receivedFileService,
   });
 
   final TransferServer transferServer;
@@ -29,6 +31,7 @@ class ReceiverController extends ChangeNotifier {
   final PairingController pairingController;
   final StartAdvertisingUseCase? startAdvertisingUseCase;
   final StopAdvertisingUseCase? stopAdvertisingUseCase;
+  final ReceivedFileService? receivedFileService;
 
   StreamSubscription<TransferServerEvent>? _serverEventsSubscription;
   bool _isStarting = false;
@@ -161,6 +164,15 @@ class ReceiverController extends ChangeNotifier {
     _currentOffer = null;
     _currentReceivedBytes = 0;
     notifyListeners();
+  }
+
+  /// Opens a received [file] using the platform's default viewer or explorer.
+  Future<bool> openReceivedFile(SelectedFile file) async {
+    final service = receivedFileService;
+    if (service == null) {
+      return false;
+    }
+    return service.openReceivedFile(file.path);
   }
 
   @override

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:partilha/core/errors/failure.dart';
 import 'package:partilha/core/network/local_address_resolver.dart';
+import 'package:partilha/core/platform/platform.dart';
 import 'package:partilha/core/protocol/qr_payload.dart';
 import 'package:partilha/core/result/result.dart';
 import 'package:partilha/core/theme/theme.dart';
@@ -78,18 +79,38 @@ class FakeTransferServer implements TransferServer {
   Future<void> dispose() => _events.close();
 }
 
+class FakeReceivedFileService implements ReceivedFileService {
+  String? lastOpenedPath;
+  bool shouldSucceed = true;
+
+  @override
+  Future<String> finalizeReceivedFile({
+    required String sourcePath,
+    required String fileName,
+  }) async => sourcePath;
+
+  @override
+  Future<bool> openReceivedFile(String path) async {
+    lastOpenedPath = path;
+    return shouldSucceed;
+  }
+}
+
 void main() {
   late MockPairingController pairingController;
   late ReceiverController receiverController;
   late FakeTransferServer transferServer;
+  late FakeReceivedFileService receivedFileService;
 
   setUp(() {
     pairingController = MockPairingController();
     transferServer = FakeTransferServer();
+    receivedFileService = FakeReceivedFileService();
     receiverController = ReceiverController(
       transferServer: transferServer,
       deviceAddressResolver: FakeAddressResolver(),
       pairingController: pairingController,
+      receivedFileService: receivedFileService,
     );
   });
 
@@ -250,5 +271,10 @@ void main() {
     expect(find.text('Saved to Downloads folder'), findsOneWidget);
     expect(find.text('document.pdf'), findsOneWidget);
     expect(find.byIcon(Icons.check_circle), findsOneWidget);
+
+    await tester.ensureVisible(find.text('document.pdf'));
+    await tester.tap(find.text('document.pdf'));
+    await tester.pump();
+    expect(receivedFileService.lastOpenedPath, '/Downloads/document.pdf');
   });
 }
