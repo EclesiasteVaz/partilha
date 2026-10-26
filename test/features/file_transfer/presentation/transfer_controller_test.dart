@@ -267,18 +267,89 @@ void main() {
 
       expect(called, isTrue);
     });
+
+    test(
+      'disconnect cancels active items, closes session, resets queue, and resets state',
+      () async {
+        final fakeRepo = _FakeTransferRepository();
+        final cancelledIds = <String>[];
+        bool resetCalled = false;
+        const itemActive = TransferItem(
+          request: TransferRequest(
+            id: 'item-1',
+            destination: destination,
+            file: SelectedFile(name: 'a.txt', path: '/a', sizeInBytes: 10),
+          ),
+          status: TransferStatus.transferring,
+        );
+        const itemDone = TransferItem(
+          request: TransferRequest(
+            id: 'item-2',
+            destination: destination,
+            file: SelectedFile(name: 'b.txt', path: '/b', sizeInBytes: 20),
+          ),
+          status: TransferStatus.completed,
+        );
+
+        final fakeQueue = _FakeTransferQueue(
+          initialItems: <TransferItem>[itemActive, itemDone],
+          onCancel: cancelledIds.add,
+          onReset: () => resetCalled = true,
+        );
+
+        final testController = TransferController(
+          selectFiles: SelectFilesUseCase(service),
+          cancelTransferUseCase: CancelTransferUseCase(fakeQueue),
+          closeTransferSessionUseCase: CloseTransferSessionUseCase(fakeRepo),
+          transferQueue: fakeQueue,
+        );
+
+        testController.setDestination(destination);
+        expect(testController.state.destination, destination);
+
+        await testController.disconnect();
+
+        expect(cancelledIds, <String>['item-1']);
+        expect(fakeRepo.closed, isTrue);
+        expect(resetCalled, isTrue);
+        expect(testController.state.destination, isNull);
+        expect(testController.state.status, TransferSetupStatus.initial);
+      },
+    );
   });
 }
 
-class _FakeTransferQueue implements TransferQueue {
-  _FakeTransferQueue({this.onEnqueue, this.onClearCompleted});
+class _FakeTransferRepository implements TransferRepository {
+  bool closed = false;
 
+  @override
+  Stream<FileTransferProgress> send(TransferRequest request) =>
+      const Stream<FileTransferProgress>.empty();
+
+  @override
+  Future<void> closeSession() async {
+    closed = true;
+  }
+}
+
+class _FakeTransferQueue implements TransferQueue {
+  _FakeTransferQueue({
+    this.initialItems = const <TransferItem>[],
+    this.onEnqueue,
+    this.onClearCompleted,
+    this.onCancel,
+    this.onReset,
+  });
+
+  final List<TransferItem> initialItems;
   final void Function(
     TransferDestination destination,
     List<SelectedFile> files,
   )?
   onEnqueue;
   final void Function()? onClearCompleted;
+  final void Function(String transferId)? onCancel;
+  final void Function()? onReset;
 
   @override
   void enqueue({
@@ -294,16 +365,20 @@ class _FakeTransferQueue implements TransferQueue {
   }
 
   @override
-  void cancel(String transferId) {}
+  void cancel(String transferId) {
+    onCancel?.call(transferId);
+  }
 
   @override
-  void reset() {}
+  void reset() {
+    onReset?.call();
+  }
 
   @override
   Future<void> dispose() async {}
 
   @override
-  List<TransferItem> get items => const <TransferItem>[];
+  List<TransferItem> get items => initialItems;
 
   @override
   Stream<List<TransferItem>> get updates =>

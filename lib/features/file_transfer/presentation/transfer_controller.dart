@@ -63,6 +63,7 @@ class TransferController extends ChangeNotifier {
     this.queueTransfers,
     this.cancelTransferUseCase,
     this.clearCompletedTransfersUseCase,
+    this.closeTransferSessionUseCase,
     this.transferQueue,
   }) {
     _initQueueSubscription();
@@ -72,6 +73,7 @@ class TransferController extends ChangeNotifier {
   final QueueTransfersUseCase? queueTransfers;
   final CancelTransferUseCase? cancelTransferUseCase;
   final ClearCompletedTransfersUseCase? clearCompletedTransfersUseCase;
+  final CloseTransferSessionUseCase? closeTransferSessionUseCase;
   final TransferQueue? transferQueue;
 
   StreamSubscription<List<TransferItem>>? _queueSubscription;
@@ -216,6 +218,18 @@ class TransferController extends ChangeNotifier {
   /// Cancels in-flight transfers and clears the entire queue.
   void resetQueue() {
     transferQueue?.reset();
+  }
+
+  /// Cancels in-flight transfers, closes active peer sockets, and resets destination and queue.
+  Future<void> disconnect() async {
+    for (final item in _queueItems) {
+      if (!item.status.isTerminal) {
+        cancelTransfer(item.transferId);
+      }
+    }
+    await closeTransferSessionUseCase?.call();
+    resetQueue();
+    _emit(const TransferState());
   }
 
   /// Cancels an in-flight, queued or backing-off transfer by its ID.

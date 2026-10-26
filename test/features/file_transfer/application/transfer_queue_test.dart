@@ -42,6 +42,9 @@ class ScriptedTransferRepository implements TransferRepository {
       ),
     ]);
   }
+
+  @override
+  Future<void> closeSession() async {}
 }
 
 void main() {
