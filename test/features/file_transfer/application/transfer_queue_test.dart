@@ -629,33 +629,44 @@ void main() {
   });
 
   group('clearCompleted', () {
-    test('removes items in terminal states and preserves active items', () async {
-      final StreamController<FileTransferProgress> activeStream =
-          StreamController<FileTransferProgress>.broadcast();
-      repo.scripts['running.txt'] = (_) => activeStream.stream;
+    test(
+      'removes items in terminal states and preserves active items',
+      () async {
+        final StreamController<FileTransferProgress> activeStream =
+            StreamController<FileTransferProgress>.broadcast();
+        repo.scripts['running.txt'] = (_) => activeStream.stream;
 
-      queue.enqueue(
-        destination: destination,
-        files: <SelectedFile>[
-          file(name: 'completed.txt'),
-          file(name: 'running.txt'),
-        ],
-      );
+        queue.enqueue(
+          destination: destination,
+          files: <SelectedFile>[
+            file(name: 'completed.txt'),
+            file(name: 'running.txt'),
+          ],
+        );
 
-      // Wait until completed.txt completes and running.txt starts
-      await until(() => queue.items.any((item) => item.status == TransferStatus.completed));
-      await until(() => queue.items.any((item) => item.status == TransferStatus.transferring));
+        // Wait until completed.txt completes and running.txt starts
+        await until(
+          () => queue.items.any(
+            (item) => item.status == TransferStatus.completed,
+          ),
+        );
+        await until(
+          () => queue.items.any(
+            (item) => item.status == TransferStatus.transferring,
+          ),
+        );
 
-      expect(queue.items.length, 2);
+        expect(queue.items.length, 2);
 
-      queue.clearCompleted();
+        queue.clearCompleted();
 
-      expect(queue.items.length, 1);
-      expect(queue.items.single.fileName, 'running.txt');
-      expect(queue.items.single.status, TransferStatus.transferring);
+        expect(queue.items.length, 1);
+        expect(queue.items.single.fileName, 'running.txt');
+        expect(queue.items.single.status, TransferStatus.transferring);
 
-      await activeStream.close();
-    });
+        await activeStream.close();
+      },
+    );
 
     test('ClearCompletedTransfersUseCase delegates to queue', () async {
       queue.enqueue(
@@ -673,25 +684,30 @@ void main() {
   });
 
   group('reset', () {
-    test('clears all items from queue and releases active subscription', () async {
-      bool released = false;
-      final StreamController<FileTransferProgress> activeStream =
-          StreamController<FileTransferProgress>(
-            onCancel: () => released = true,
-          );
-      repo.scripts['file.txt'] = (_) => activeStream.stream;
+    test(
+      'clears all items from queue and releases active subscription',
+      () async {
+        bool released = false;
+        final StreamController<FileTransferProgress> activeStream =
+            StreamController<FileTransferProgress>(
+              onCancel: () => released = true,
+            );
+        repo.scripts['file.txt'] = (_) => activeStream.stream;
 
-      queue.enqueue(
-        destination: destination,
-        files: <SelectedFile>[file(name: 'file.txt')],
-      );
-      await until(() => queue.items.single.status == TransferStatus.transferring);
+        queue.enqueue(
+          destination: destination,
+          files: <SelectedFile>[file(name: 'file.txt')],
+        );
+        await until(
+          () => queue.items.single.status == TransferStatus.transferring,
+        );
 
-      queue.reset();
+        queue.reset();
 
-      expect(queue.items, isEmpty);
-      await until(() => released);
-      await activeStream.close();
-    });
+        expect(queue.items, isEmpty);
+        await until(() => released);
+        await activeStream.close();
+      },
+    );
   });
 }

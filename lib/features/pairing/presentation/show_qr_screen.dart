@@ -99,151 +99,156 @@ class ShowQrScreen extends StatelessWidget {
             body: Builder(
               builder: (context) {
                 if (receiverError != null && state is! PairingStateShowingQr) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 48,
-                        color: context.colors.danger,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Failed to prepare receiver',
-                        style: context.textStyles.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        receiverError.userMessage,
-                        style: context.textStyles.bodyMedium.copyWith(
-                          color: context.colors.onSurfaceMuted,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: () {
-                          controller.reset();
-                          unawaited(receiverController?.startReceiving());
-                        },
-                        child: const Text('Try Again'),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-
-            return switch (state) {
-              PairingStateInitial() || PairingStateGeneratingQr() =>
-                const Center(child: CircularProgressIndicator()),
-              PairingStateShowingQr(:final payload, :final rawQrString) =>
-                Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Scan to Connect',
-                          style: context.textStyles.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Show this QR code to the sending device.',
-                          style: context.textStyles.bodyMedium.copyWith(
-                            color: context.colors.onSurfaceMuted,
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: context.colors.danger,
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 24),
-                        Semantics(
-                          label: 'Pairing QR Code for ${payload.deviceName}',
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
+                          const SizedBox(height: 16),
+                          Text(
+                            'Failed to prepare receiver',
+                            style: context.textStyles.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            receiverError.userMessage,
+                            style: context.textStyles.bodyMedium.copyWith(
+                              color: context.colors.onSurfaceMuted,
                             ),
-                            child: QrImageView(
-                              data: rawQrString,
-                              version: QrVersions.auto,
-                              size: 220,
-                              backgroundColor: Colors.white,
-                            ),
+                            textAlign: TextAlign.center,
                           ),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          payload.deviceName,
-                          style: context.textStyles.titleMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${payload.host}:${payload.port}',
-                          style: context.textStyles.labelMedium.copyWith(
-                            color: context.colors.onSurfaceMuted,
-                          ),
-                        ),
-                        if (receiverController != null) ...[
                           const SizedBox(height: 24),
-                          _ReceiverStatusSection(receiver: receiverController!),
+                          FilledButton(
+                            onPressed: () {
+                              controller.reset();
+                              unawaited(receiverController?.startReceiving());
+                            },
+                            child: const Text('Try Again'),
+                          ),
                         ],
-                      ],
+                      ),
+                    ),
+                  );
+                }
+
+                return switch (state) {
+                  PairingStateInitial() || PairingStateGeneratingQr() =>
+                    const Center(child: CircularProgressIndicator()),
+                  PairingStateShowingQr(:final payload, :final rawQrString) =>
+                    Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Scan to Connect',
+                              style: context.textStyles.titleLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Show this QR code to the sending device.',
+                              style: context.textStyles.bodyMedium.copyWith(
+                                color: context.colors.onSurfaceMuted,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 24),
+                            Semantics(
+                              label:
+                                  'Pairing QR Code for ${payload.deviceName}',
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: QrImageView(
+                                  data: rawQrString,
+                                  version: QrVersions.auto,
+                                  size: 220,
+                                  backgroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              payload.deviceName,
+                              style: context.textStyles.titleMedium,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${payload.host}:${payload.port}',
+                              style: context.textStyles.labelMedium.copyWith(
+                                color: context.colors.onSurfaceMuted,
+                              ),
+                            ),
+                            if (receiverController != null) ...[
+                              const SizedBox(height: 24),
+                              _ReceiverStatusSection(
+                                receiver: receiverController!,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  PairingStateFailed(:final failure) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: context.colors.danger,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Failed to generate pairing QR',
+                            style: context.textStyles.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            failure.userMessage,
+                            style: context.textStyles.bodyMedium.copyWith(
+                              color: context.colors.onSurfaceMuted,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
+                          FilledButton(
+                            onPressed: controller.reset,
+                            child: const Text('Try Again'),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              PairingStateFailed(:final failure) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 48,
-                        color: context.colors.danger,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Failed to generate pairing QR',
-                        style: context.textStyles.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        failure.userMessage,
-                        style: context.textStyles.bodyMedium.copyWith(
-                          color: context.colors.onSurfaceMuted,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: controller.reset,
-                        child: const Text('Try Again'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              _ => const SizedBox.shrink(),
-            };
-          },
-        ),
-      ),
+                  _ => const SizedBox.shrink(),
+                };
+              },
+            ),
+          ),
+        );
+      },
     );
-  },
-);
   }
 }
 

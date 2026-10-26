@@ -401,10 +401,7 @@ class _QueueItemCard extends StatelessWidget {
                 if (!item.status.isTerminal)
                   IconButton(
                     onPressed: () => onCancel(item.transferId),
-                    icon: const AppIcon(
-                      AppIcons.remove,
-                      size: AppIconSizes.sm,
-                    ),
+                    icon: const AppIcon(AppIcons.remove, size: AppIconSizes.sm),
                     tooltip: 'Cancel transfer',
                   ),
               ],

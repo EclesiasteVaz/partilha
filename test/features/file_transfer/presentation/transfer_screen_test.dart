@@ -164,7 +164,10 @@ void main() {
     final Finder send = find.widgetWithText(FilledButton, 'Send');
     expect(send, findsOneWidget);
     expect(tester.widget<FilledButton>(send).onPressed, isNull);
-    expect(find.text('Pair with this device to enable transfer.'), findsOneWidget);
+    expect(
+      find.text('Pair with this device to enable transfer.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('shows the total for the selection', (tester) async {
@@ -225,7 +228,9 @@ void main() {
 
       controller = TransferController(
         selectFiles: SelectFilesUseCase(service),
-        clearCompletedTransfersUseCase: ClearCompletedTransfersUseCase(fakeQueue),
+        clearCompletedTransfersUseCase: ClearCompletedTransfersUseCase(
+          fakeQueue,
+        ),
         transferQueue: fakeQueue,
       );
 
@@ -240,38 +245,37 @@ void main() {
     },
   );
 
-  testWidgets(
-    'shows Add more files button and queue items simultaneously',
-    (tester) async {
-      final StreamController<List<TransferItem>> streamController =
-          StreamController<List<TransferItem>>.broadcast();
-      final _FakeTransferQueue fakeQueue = _FakeTransferQueue(
-        stream: streamController.stream,
-        initialItems: <TransferItem>[
-          TransferItem(
-            request: TransferRequest(
-              id: '1',
-              destination: destination,
-              file: files.first,
-            ),
-            status: TransferStatus.transferring,
+  testWidgets('shows Add more files button and queue items simultaneously', (
+    tester,
+  ) async {
+    final StreamController<List<TransferItem>> streamController =
+        StreamController<List<TransferItem>>.broadcast();
+    final _FakeTransferQueue fakeQueue = _FakeTransferQueue(
+      stream: streamController.stream,
+      initialItems: <TransferItem>[
+        TransferItem(
+          request: TransferRequest(
+            id: '1',
+            destination: destination,
+            file: files.first,
           ),
-        ],
-      );
+          status: TransferStatus.transferring,
+        ),
+      ],
+    );
 
-      controller = TransferController(
-        selectFiles: SelectFilesUseCase(service),
-        transferQueue: fakeQueue,
-      );
+    controller = TransferController(
+      selectFiles: SelectFilesUseCase(service),
+      transferQueue: fakeQueue,
+    );
 
-      await pump(tester);
+    await pump(tester);
 
-      expect(find.text('report.pdf'), findsOneWidget);
-      expect(find.text('Add more files'), findsOneWidget);
+    expect(find.text('report.pdf'), findsOneWidget);
+    expect(find.text('Add more files'), findsOneWidget);
 
-      await streamController.close();
-    },
-  );
+    await streamController.close();
+  });
 }
 
 class _FakeTransferQueue implements TransferQueue {
