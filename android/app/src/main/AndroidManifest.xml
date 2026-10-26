@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Network access permissions required for local socket communication
+         and mDNS discovery across all build modes. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+
     <!-- Required by WifiManager.MulticastLock. Without it Android silently drops
          the multicast traffic mDNS discovery depends on, and the result is an
          empty device list rather than an error. Normal permission, so no runtime

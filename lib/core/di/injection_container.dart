@@ -175,6 +175,7 @@ void configureDependencies({required AppLogger logger}) {
       () => MdnsDiscoveryService(
         hostName: Platform.localHostname,
         multicastLock: injectionContainer.resolve<MulticastLock>(),
+        reusePort: !Platform.isAndroid,
       ),
     )
     ..registerFactory<DiscoverNearbyDevicesUseCase>(

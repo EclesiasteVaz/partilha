@@ -10,15 +10,22 @@ import 'fake_multicast_lock.dart';
 /// Returns fixed addresses so the test never depends on the machine's real
 /// network topology.
 class StubAddressResolver implements LocalAddressResolver {
-  StubAddressResolver(this.addresses);
+  StubAddressResolver(this.addresses, {this.primaryInterface});
 
   final List<InternetAddress> addresses;
+  final NetworkInterface? primaryInterface;
   String? lastRequestedInterface;
 
   @override
   Future<List<InternetAddress>> resolve({String? interfaceName}) async {
     lastRequestedInterface = interfaceName;
     return addresses;
+  }
+
+  @override
+  Future<NetworkInterface?> findPrimaryInterface({String? interfaceName}) async {
+    lastRequestedInterface = interfaceName;
+    return primaryInterface;
   }
 }
 

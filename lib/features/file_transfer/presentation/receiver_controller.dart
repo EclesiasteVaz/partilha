@@ -107,12 +107,15 @@ class ReceiverController extends ChangeNotifier {
         pairingState is PairingStateShowingQr) {
       final payload = pairingState.payload;
       try {
-        await startAdvertisingUseCase!.call(
+        final adResult = await startAdvertisingUseCase!.call(
           deviceId: payload.deviceId,
           deviceName: payload.deviceName,
           port: port,
           capabilities: const <String, String>{'file-transfer': '1'},
         );
+        if (adResult.isFailure) {
+          // mDNS advertising failure is non-fatal: QR carries direct IP/port.
+        }
       } on Object catch (_) {
         // mDNS advertising failure is non-fatal: QR carries direct IP/port.
       }

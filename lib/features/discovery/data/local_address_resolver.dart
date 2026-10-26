@@ -19,6 +19,10 @@ abstract interface class LocalAddressResolver {
   /// [interfaceName] matches [NetworkInterface.name], e.g. `en0` on macOS or
   /// `wlan0` on Android. When null the resolver applies its own default.
   Future<List<InternetAddress>> resolve({String? interfaceName});
+
+  /// Resolves the primary local network interface (e.g. Wi-Fi / private LAN),
+  /// or null if none is available.
+  Future<NetworkInterface?> findPrimaryInterface({String? interfaceName});
 }
 
 /// Announces every non-loopback address.
@@ -55,5 +59,45 @@ class AllNonLoopbackAddresses implements LocalAddressResolver {
       }
     }
     return found;
+  }
+
+  @override
+  Future<NetworkInterface?> findPrimaryInterface({String? interfaceName}) async {
+    final interfaces = await NetworkInterface.list(
+      type: InternetAddressType.IPv4,
+      includeLoopback: false,
+    );
+    if (interfaces.isEmpty) return null;
+
+    if (interfaceName != null) {
+      for (final iface in interfaces) {
+        if (iface.name == interfaceName) return iface;
+      }
+    }
+
+    // Priority: Private LAN ranges (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+    for (final iface in interfaces) {
+      for (final addr in iface.addresses) {
+        final ip = addr.address;
+        if (ip.startsWith('192.168.') ||
+            ip.startsWith('10.') ||
+            _is172Private(ip)) {
+          return iface;
+        }
+      }
+    }
+
+    return interfaces.firstOrNull;
+  }
+
+  static bool _is172Private(String ip) {
+    if (ip.startsWith('172.')) {
+      final parts = ip.split('.');
+      if (parts.length >= 2) {
+        final second = int.tryParse(parts[1]);
+        if (second != null && second >= 16 && second <= 31) return true;
+      }
+    }
+    return false;
   }
 }

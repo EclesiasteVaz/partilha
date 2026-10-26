@@ -20,7 +20,7 @@ class MdnsDiscoveryService implements DiscoveryService {
   MdnsDiscoveryService({
     required this.hostName,
     required this.multicastLock,
-    this.responseTimeout = const Duration(seconds: 3),
+    this.responseTimeout = const Duration(seconds: 4),
     this.addressResolver = const AllNonLoopbackAddresses(),
     this.reusePort = true,
   });
@@ -109,10 +109,15 @@ class MdnsDiscoveryService implements DiscoveryService {
       // running the spike in `docs/decisions/0002-mdns-provider.md`, where the
       // query went out and returned zero devices while `dns-sd` saw the same
       // record fine.
+      final NetworkInterface? primaryInterface =
+          await addressResolver.findPrimaryInterface();
+
       final List<ServiceEntry> entries = await MDNSClient.discover(
         serviceType,
         timeout: responseTimeout,
         reusePort: reusePort,
+        wantUnicastResponse: true,
+        networkInterface: primaryInterface,
       );
 
       // Duplicate suppression: a device answers a query more than once, and the
@@ -209,8 +214,17 @@ class MdnsDiscoveryService implements DiscoveryService {
         ],
       );
 
+      final NetworkInterface? primaryInterface =
+          await addressResolver.findPrimaryInterface(
+        interfaceName: interfaceName,
+      );
+
       final MDNSServer server = MDNSServer(
-        MDNSServerConfig(zone: service, reusePort: reusePort),
+        MDNSServerConfig(
+          zone: service,
+          reusePort: reusePort,
+          networkInterface: primaryInterface,
+        ),
       );
       await server.start();
       _server = server;
