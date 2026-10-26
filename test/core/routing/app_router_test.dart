@@ -120,8 +120,8 @@ void main() {
         AppRoute.scanQr,
       ]);
 
-      final PairingController pairingController =
-          injectionContainer.resolve<PairingController>();
+      final PairingController pairingController = injectionContainer
+          .resolve<PairingController>();
       const payload = QrPayload(
         v: 1,
         deviceId: 'peer-1',
@@ -141,8 +141,10 @@ void main() {
         AppRoute.transfer,
       ]);
 
-      final TransferDestination? dest =
-          injectionContainer.resolve<TransferController>().state.destination;
+      final TransferDestination? dest = injectionContainer
+          .resolve<TransferController>()
+          .state
+          .destination;
       expect(dest?.deviceId, 'peer-1');
       expect(dest?.token, 'token-abc');
     },
@@ -168,8 +170,8 @@ void main() {
         AppRoute.scanQr,
       ]);
 
-      final PairingController pairingController =
-          injectionContainer.resolve<PairingController>();
+      final PairingController pairingController = injectionContainer
+          .resolve<PairingController>();
       const payload = QrPayload(
         v: 1,
         deviceId: 'peer-2',

@@ -237,6 +237,11 @@ void configureDependencies({required AppLogger logger}) {
     ..registerFactory<CancelTransferUseCase>(
       () => CancelTransferUseCase(injectionContainer.resolve<TransferQueue>()),
     )
+    ..registerFactory<ClearCompletedTransfersUseCase>(
+      () => ClearCompletedTransfersUseCase(
+        injectionContainer.resolve<TransferQueue>(),
+      ),
+    )
     // A singleton, unlike the other controllers, because it is the only holder
     // of the destination and the selection: Discovery sets the destination and
     // the Transfer screen reads it, so a factory per screen would lose the
@@ -247,6 +252,8 @@ void configureDependencies({required AppLogger logger}) {
         queueTransfers: injectionContainer.resolve<QueueTransfersUseCase>(),
         cancelTransferUseCase: injectionContainer
             .resolve<CancelTransferUseCase>(),
+        clearCompletedTransfersUseCase: injectionContainer
+            .resolve<ClearCompletedTransfersUseCase>(),
         transferQueue: injectionContainer.resolve<TransferQueue>(),
       ),
     )
