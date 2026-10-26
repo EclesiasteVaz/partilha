@@ -203,6 +203,97 @@ void main() {
     expect(dismissed, isTrue);
   });
 
+  testWidgets(
+    'shows confirmation dialog when back button is tapped during active transfer and cancels exit',
+    (tester) async {
+      bool dismissed = false;
+      const payload = QrPayload(
+        v: 1,
+        deviceId: 'dev-1',
+        deviceName: 'My Device',
+        host: '192.168.1.10',
+        port: 8080,
+        token: 'tok-123',
+      );
+      pairingController.setState(
+        const PairingState.showingQr(
+          payload: payload,
+          rawQrString: '{"test": 1}',
+        ),
+      );
+
+      await receiverController.startReceiving();
+      await pumpScreen(tester, onDismiss: () => dismissed = true);
+      await tester.pumpAndSettle();
+
+      const offer = TransferOffer(
+        id: 'xfer-1',
+        name: 'file.txt',
+        sizeInBytes: 1024,
+        meta: {},
+      );
+      transferServer._events.add(TransferServerOfferReceived(offer: offer));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.arrow_back));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cancel receiving?'), findsOneWidget);
+      expect(dismissed, isFalse);
+
+      await tester.tap(find.text('Continue receiving'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cancel receiving?'), findsNothing);
+      expect(dismissed, isFalse);
+      expect(find.byType(ShowQrScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'confirms cancel dialog during active transfer and calls onDismiss',
+    (tester) async {
+      bool dismissed = false;
+      const payload = QrPayload(
+        v: 1,
+        deviceId: 'dev-1',
+        deviceName: 'My Device',
+        host: '192.168.1.10',
+        port: 8080,
+        token: 'tok-123',
+      );
+      pairingController.setState(
+        const PairingState.showingQr(
+          payload: payload,
+          rawQrString: '{"test": 1}',
+        ),
+      );
+
+      await receiverController.startReceiving();
+      await pumpScreen(tester, onDismiss: () => dismissed = true);
+      await tester.pumpAndSettle();
+
+      const offer = TransferOffer(
+        id: 'xfer-1',
+        name: 'file.txt',
+        sizeInBytes: 1024,
+        meta: {},
+      );
+      transferServer._events.add(TransferServerOfferReceived(offer: offer));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.arrow_back));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cancel receiving?'), findsOneWidget);
+
+      await tester.tap(find.text('Cancel transfer'));
+      await tester.pumpAndSettle();
+
+      expect(dismissed, isTrue);
+    },
+  );
+
   testWidgets('shows error state and try again button on failure', (
     tester,
   ) async {

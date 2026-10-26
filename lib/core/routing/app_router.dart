@@ -66,10 +66,12 @@ class AppRouterDelegate extends RouterDelegate<AppRoute>
           for (final AppRoute route in _currentRoute.stack) _pageFor(route),
         ],
         // The stack lives in [CurrentRoute], which is the single source of
-        // truth. Flutter removes pages declaratively from [pages], so this
-        // callback only has to reconcile: a page disappearing here is the result
-        // of `popRoute` already having updated the stack.
-        onDidRemovePage: (_) {},
+        // truth. Flutter calls onDidRemovePage when a page is popped by a
+        // route (e.g. via the AppBar back button or Navigator.pop). We
+        // reconcile by popping the declarative stack.
+        onDidRemovePage: (Page<Object?> page) {
+          _currentRoute.pop();
+        },
       ),
     );
   }
@@ -124,7 +126,13 @@ class AppRouterDelegate extends RouterDelegate<AppRoute>
                 certificateFingerprint: contextData.certificateFingerprint,
               ),
             );
-            _currentRoute.go(AppRoute.transfer);
+            // If the user entered QR scanning from TransferScreen, popping returns
+            // to that screen with the updated destination instead of stacking a duplicate.
+            if (_currentRoute.stack.contains(AppRoute.transfer)) {
+              _currentRoute.pop();
+            } else {
+              _currentRoute.go(AppRoute.transfer);
+            }
           }
         },
       ),
@@ -148,7 +156,13 @@ class AppRouterDelegate extends RouterDelegate<AppRoute>
   void push(AppRoute route) => _currentRoute.push(route);
 
   @override
-  Future<bool> popRoute() async => _currentRoute.pop();
+  Future<bool> popRoute() async {
+    final NavigatorState? navigator = navigatorKey.currentState;
+    if (navigator != null) {
+      return navigator.maybePop();
+    }
+    return _currentRoute.pop();
+  }
 }
 
 /// Pushes [route] onto the navigation stack.

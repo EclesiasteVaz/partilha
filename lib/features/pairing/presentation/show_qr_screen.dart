@@ -24,36 +24,81 @@ class ShowQrScreen extends StatelessWidget {
   final ReceiverController? receiverController;
   final VoidCallback? onDismiss;
 
+  Future<bool> _confirmCancel(BuildContext context) async {
+    final bool? result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Cancel receiving?'),
+          content: const Text(
+            'A file is currently being transferred. Leaving now will cancel the transfer.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Continue receiving'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Cancel transfer'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final Listenable listenable = receiverController != null
         ? Listenable.merge(<Listenable>[controller, receiverController!])
         : controller;
 
-    return PopScope(
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) {
-          onDismiss?.call();
-        }
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Receive Files'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              onDismiss?.call();
-              unawaited(Navigator.of(context).maybePop());
-            },
-          ),
-        ),
-        body: ListenableBuilder(
-          listenable: listenable,
-          builder: (context, _) {
-            final state = controller.state;
-            final receiverError = receiverController?.lastError;
+    return ListenableBuilder(
+      listenable: listenable,
+      builder: (BuildContext context, _) {
+        final bool isReceiving = receiverController?.currentOffer != null;
+        final state = controller.state;
+        final receiverError = receiverController?.lastError;
 
-            if (receiverError != null && state is! PairingStateShowingQr) {
+        return PopScope(
+          canPop: !isReceiving,
+          onPopInvokedWithResult: (bool didPop, result) async {
+            if (didPop) {
+              onDismiss?.call();
+              return;
+            }
+            if (isReceiving) {
+              final bool shouldPop = await _confirmCancel(context);
+              if (shouldPop && context.mounted) {
+                onDismiss?.call();
+                Navigator.of(context).pop();
+              }
+            }
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Receive Files'),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () async {
+                  if (isReceiving) {
+                    final bool shouldPop = await _confirmCancel(context);
+                    if (shouldPop && context.mounted) {
+                      onDismiss?.call();
+                      Navigator.of(context).pop();
+                    }
+                  } else {
+                    onDismiss?.call();
+                    unawaited(Navigator.of(context).maybePop());
+                  }
+                },
+              ),
+            ),
+            body: Builder(
+              builder: (context) {
+                if (receiverError != null && state is! PairingStateShowingQr) {
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
@@ -197,6 +242,8 @@ class ShowQrScreen extends StatelessWidget {
         ),
       ),
     );
+  },
+);
   }
 }
 
