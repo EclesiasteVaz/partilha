@@ -23,7 +23,9 @@ class StubAddressResolver implements LocalAddressResolver {
   }
 
   @override
-  Future<NetworkInterface?> findPrimaryInterface({String? interfaceName}) async {
+  Future<NetworkInterface?> findPrimaryInterface({
+    String? interfaceName,
+  }) async {
     lastRequestedInterface = interfaceName;
     return primaryInterface;
   }

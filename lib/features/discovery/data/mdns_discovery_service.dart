@@ -109,8 +109,8 @@ class MdnsDiscoveryService implements DiscoveryService {
       // running the spike in `docs/decisions/0002-mdns-provider.md`, where the
       // query went out and returned zero devices while `dns-sd` saw the same
       // record fine.
-      final NetworkInterface? primaryInterface =
-          await addressResolver.findPrimaryInterface();
+      final NetworkInterface? primaryInterface = await addressResolver
+          .findPrimaryInterface();
 
       final List<ServiceEntry> entries = await MDNSClient.discover(
         serviceType,
@@ -214,10 +214,8 @@ class MdnsDiscoveryService implements DiscoveryService {
         ],
       );
 
-      final NetworkInterface? primaryInterface =
-          await addressResolver.findPrimaryInterface(
-        interfaceName: interfaceName,
-      );
+      final NetworkInterface? primaryInterface = await addressResolver
+          .findPrimaryInterface(interfaceName: interfaceName);
 
       final MDNSServer server = MDNSServer(
         MDNSServerConfig(

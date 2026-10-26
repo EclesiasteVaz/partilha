@@ -62,7 +62,9 @@ class AllNonLoopbackAddresses implements LocalAddressResolver {
   }
 
   @override
-  Future<NetworkInterface?> findPrimaryInterface({String? interfaceName}) async {
+  Future<NetworkInterface?> findPrimaryInterface({
+    String? interfaceName,
+  }) async {
     final interfaces = await NetworkInterface.list(
       type: InternetAddressType.IPv4,
       includeLoopback: false,
