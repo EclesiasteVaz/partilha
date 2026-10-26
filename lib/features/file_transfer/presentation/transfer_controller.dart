@@ -62,6 +62,7 @@ class TransferController extends ChangeNotifier {
     required this.selectFiles,
     this.queueTransfers,
     this.cancelTransferUseCase,
+    this.clearCompletedTransfersUseCase,
     this.transferQueue,
   }) {
     _initQueueSubscription();
@@ -70,6 +71,7 @@ class TransferController extends ChangeNotifier {
   final SelectFilesUseCase selectFiles;
   final QueueTransfersUseCase? queueTransfers;
   final CancelTransferUseCase? cancelTransferUseCase;
+  final ClearCompletedTransfersUseCase? clearCompletedTransfersUseCase;
   final TransferQueue? transferQueue;
 
   StreamSubscription<List<TransferItem>>? _queueSubscription;
@@ -139,10 +141,16 @@ class TransferController extends ChangeNotifier {
           _emit(_state.copyWith(status: _statusFor(_state.files)));
           return;
         }
+        final List<SelectedFile> updated = List<SelectedFile>.of(_state.files);
+        for (final file in value) {
+          if (!updated.any((existing) => existing.path == file.path)) {
+            updated.add(file);
+          }
+        }
         _emit(
           _state.copyWith(
             status: TransferSetupStatus.ready,
-            files: value,
+            files: List<SelectedFile>.unmodifiable(updated),
             error: null,
           ),
         );
@@ -179,13 +187,35 @@ class TransferController extends ChangeNotifier {
     if (queue == null || destination == null || _state.files.isEmpty) {
       return;
     }
+    final filesToSend = List<SelectedFile>.of(_state.files);
     final result = await queue.call(
       destination: destination,
-      files: _state.files,
+      files: filesToSend,
     );
     if (result.isFailure) {
       _emit(_state.copyWith(error: result.errorOrNull));
+    } else {
+      _emit(
+        _state.copyWith(
+          files: const <SelectedFile>[],
+          status: TransferSetupStatus.initial,
+          error: null,
+        ),
+      );
     }
+  }
+
+  /// Removes completed, failed, or cancelled transfers from the queue.
+  void clearCompleted() {
+    clearCompletedTransfersUseCase?.call();
+    if (clearCompletedTransfersUseCase == null) {
+      transferQueue?.clearCompleted();
+    }
+  }
+
+  /// Cancels in-flight transfers and clears the entire queue.
+  void resetQueue() {
+    transferQueue?.reset();
   }
 
   /// Cancels an in-flight, queued or backing-off transfer by its ID.

@@ -133,6 +133,31 @@ class TransferQueue {
     }
   }
 
+  /// Removes items in terminal states (completed, failed, cancelled) from the queue.
+  void clearCompleted() {
+    _items.removeWhere((String id, TransferItem item) {
+      if (item.status.isTerminal) {
+        _speedSamples.remove(id);
+        return true;
+      }
+      return false;
+    });
+    _publish();
+  }
+
+  /// Cancels in-flight sends and clears all items from the queue.
+  void reset() {
+    final _ActiveSend? active = _active;
+    if (active != null) {
+      _complete(active.completer, const _SendOutcome.cancelled());
+      _active = null;
+      unawaited(active.subscription.cancel());
+    }
+    _items.clear();
+    _speedSamples.clear();
+    _publish();
+  }
+
   /// Releases the update stream and any in-flight send.
   ///
   /// The queue is owned by the composition root, so this runs when the owner

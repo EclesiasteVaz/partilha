@@ -74,17 +74,31 @@ class _Body extends StatelessWidget {
           Row(
             children: <Widget>[
               Expanded(
-                child: Text('Files', style: context.textStyles.titleMedium),
+                child: Text(
+                  controller.queueItems.isNotEmpty && state.files.isEmpty
+                      ? 'Transfers'
+                      : 'Files',
+                  style: context.textStyles.titleMedium,
+                ),
               ),
-              Text(
-                _formatTotal(controller.totalBytes),
-                style: context.textStyles.bodySmall,
-                // Announced as part of the row rather than read as a stray
-                // number, so a screen reader says what it totals (§50).
-                semanticsLabel: controller.totalBytes == null
-                    ? 'Total size unknown'
-                    : '${controller.totalBytes} bytes selected',
-              ),
+              if (state.files.isNotEmpty) ...<Widget>[
+                Text(
+                  _formatTotal(controller.totalBytes),
+                  style: context.textStyles.bodySmall,
+                  // Announced as part of the row rather than read as a stray
+                  // number, so a screen reader says what it totals (§50).
+                  semanticsLabel: controller.totalBytes == null
+                      ? 'Total size unknown'
+                      : '${controller.totalBytes} bytes selected',
+                ),
+                const SizedBox(width: AppSpacing.xs),
+              ],
+              if (controller.queueItems.any((item) => item.status.isTerminal))
+                TextButton.icon(
+                  onPressed: controller.clearCompleted,
+                  icon: const Icon(Icons.clear_all, size: 18),
+                  label: const Text('Clear completed'),
+                ),
             ],
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -93,7 +107,43 @@ class _Body extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
           ],
           Expanded(
-            child: controller.queueItems.isNotEmpty
+            child: (controller.queueItems.isNotEmpty && state.files.isNotEmpty)
+                ? ListView(
+                    children: <Widget>[
+                      Text(
+                        'Ready to send (${state.files.length})',
+                        style: context.textStyles.titleSmall,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      ...state.files.map(
+                        (file) => Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                          child: _FileItemCard(
+                            file: file,
+                            onRemove: controller.removeFile,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      const Divider(),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Transfer Queue (${controller.queueItems.length})',
+                        style: context.textStyles.titleSmall,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      ...controller.queueItems.map(
+                        (item) => Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                          child: _QueueItemCard(
+                            item: item,
+                            onCancel: controller.cancelTransfer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : controller.queueItems.isNotEmpty
                 ? _QueueList(
                     items: controller.queueItems,
                     onCancel: controller.cancelTransfer,
@@ -108,14 +158,16 @@ class _Body extends StatelessWidget {
                   ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          if (controller.queueItems.isEmpty) ...<Widget>[
-            FilledButton.icon(
-              onPressed: controller.pickFiles,
-              icon: const AppIcon(AppIcons.add, size: AppIconSizes.md),
-              label: Text(
-                state.files.isEmpty ? 'Choose files' : 'Add more files',
-              ),
+          FilledButton.icon(
+            onPressed: controller.pickFiles,
+            icon: const AppIcon(AppIcons.add, size: AppIconSizes.md),
+            label: Text(
+              (state.files.isEmpty && controller.queueItems.isEmpty)
+                  ? 'Choose files'
+                  : 'Add more files',
             ),
+          ),
+          if (state.files.isNotEmpty) ...<Widget>[
             const SizedBox(height: AppSpacing.sm),
             FilledButton.icon(
               onPressed:
@@ -127,23 +179,23 @@ class _Body extends StatelessWidget {
               icon: const AppIcon(AppIcons.send, size: AppIconSizes.md),
               label: const Text('Send'),
             ),
-            if (state.destination?.token == null) ...<Widget>[
-              const SizedBox(height: AppSpacing.sm),
-              OutlinedButton.icon(
-                onPressed: () => pushRoute(context, AppRoute.scanQr),
-                icon: const Icon(Icons.qr_code_scanner),
-                label: const Text('Scan QR Code to Pair'),
+          ],
+          if (state.destination?.token == null) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            OutlinedButton.icon(
+              onPressed: () => pushRoute(context, AppRoute.scanQr),
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Scan QR Code to Pair'),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            SizedBox(
+              width: double.infinity,
+              child: Text(
+                'Pair with this device to enable transfer.',
+                style: context.textStyles.bodySmall,
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: AppSpacing.xs),
-              SizedBox(
-                width: double.infinity,
-                child: Text(
-                  'Transferring is not available yet.',
-                  style: context.textStyles.bodySmall,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
+            ),
           ],
           const SizedBox(height: AppSpacing.sm),
         ],
@@ -201,6 +253,36 @@ class _DestinationCard extends StatelessWidget {
   }
 }
 
+class _FileItemCard extends StatelessWidget {
+  const _FileItemCard({required this.file, required this.onRemove});
+
+  final SelectedFile file;
+  final void Function(SelectedFile file) onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const AppIcon(AppIcons.file, size: AppIconSizes.md),
+        title: Text(file.name),
+        subtitle: Text(
+          // '?' rather than 0 B: a missing size is not an empty file, and
+          // printing 0 would understate it (§83).
+          _formatBytes(file.sizeInBytes),
+          style: context.textStyles.bodySmall,
+        ),
+        trailing: IconButton(
+          onPressed: () => onRemove(file),
+          icon: const AppIcon(AppIcons.remove, size: AppIconSizes.md),
+          // The trailing icon alone does not tell a screen reader which file
+          // it removes (§50).
+          tooltip: 'Remove ${file.name}',
+        ),
+      ),
+    );
+  }
+}
+
 class _FileList extends StatelessWidget {
   const _FileList({required this.files, required this.onRemove});
 
@@ -213,26 +295,7 @@ class _FileList extends StatelessWidget {
       itemCount: files.length,
       separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.xs),
       itemBuilder: (BuildContext context, int index) {
-        final SelectedFile file = files[index];
-        return Card(
-          child: ListTile(
-            leading: const AppIcon(AppIcons.file, size: AppIconSizes.md),
-            title: Text(file.name),
-            subtitle: Text(
-              // '?' rather than 0 B: a missing size is not an empty file, and
-              // printing 0 would understate it (§83).
-              _formatBytes(file.sizeInBytes),
-              style: context.textStyles.bodySmall,
-            ),
-            trailing: IconButton(
-              onPressed: () => onRemove(file),
-              icon: const AppIcon(AppIcons.remove, size: AppIconSizes.md),
-              // The trailing icon alone does not tell a screen reader which file
-              // it removes (§50).
-              tooltip: 'Remove ${file.name}',
-            ),
-          ),
-        );
+        return _FileItemCard(file: files[index], onRemove: onRemove);
       },
     );
   }
@@ -304,6 +367,81 @@ String _formatBytes(int? bytes) {
 String _formatTotal(int? bytes) =>
     bytes == null ? 'Total unknown' : _formatBytes(bytes);
 
+class _QueueItemCard extends StatelessWidget {
+  const _QueueItemCard({required this.item, required this.onCancel});
+
+  final TransferItem item;
+  final void Function(String id) onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final double? progress = item.fraction;
+    final String speedText = item.speedBytesPerSecond != null
+        ? '${_formatBytes(item.speedBytesPerSecond)}/s'
+        : '';
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                const AppIcon(AppIcons.file, size: AppIconSizes.md),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    item.fileName,
+                    style: context.textStyles.titleMedium,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                _StatusChip(status: item.status),
+                if (!item.status.isTerminal)
+                  IconButton(
+                    onPressed: () => onCancel(item.transferId),
+                    icon: const AppIcon(
+                      AppIcons.remove,
+                      size: AppIconSizes.sm,
+                    ),
+                    tooltip: 'Cancel transfer',
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            if (!item.status.isTerminal) ...<Widget>[
+              LinearProgressIndicator(value: progress),
+              const SizedBox(height: AppSpacing.xxs),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[
+                  Text(
+                    '${_formatBytes(item.bytesTransferred)} / ${_formatBytes(item.totalBytes)}',
+                    style: context.textStyles.bodySmall,
+                  ),
+                  if (speedText.isNotEmpty)
+                    Text(speedText, style: context.textStyles.bodySmall),
+                ],
+              ),
+            ],
+            if (item.failure != null)
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.xxs),
+                child: Text(
+                  item.failure!.userMessage,
+                  style: context.textStyles.bodySmall.copyWith(
+                    color: context.colors.danger,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _QueueList extends StatelessWidget {
   const _QueueList({required this.items, required this.onCancel});
 
@@ -316,71 +454,7 @@ class _QueueList extends StatelessWidget {
       itemCount: items.length,
       separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.xs),
       itemBuilder: (BuildContext context, int index) {
-        final TransferItem item = items[index];
-        final double? progress = item.fraction;
-        final String speedText = item.speedBytesPerSecond != null
-            ? '${_formatBytes(item.speedBytesPerSecond)}/s'
-            : '';
-
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    const AppIcon(AppIcons.file, size: AppIconSizes.md),
-                    const SizedBox(width: AppSpacing.xs),
-                    Expanded(
-                      child: Text(
-                        item.fileName,
-                        style: context.textStyles.titleMedium,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    _StatusChip(status: item.status),
-                    if (!item.status.isTerminal)
-                      IconButton(
-                        onPressed: () => onCancel(item.transferId),
-                        icon: const AppIcon(
-                          AppIcons.remove,
-                          size: AppIconSizes.sm,
-                        ),
-                        tooltip: 'Cancel transfer',
-                      ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                if (!item.status.isTerminal) ...<Widget>[
-                  LinearProgressIndicator(value: progress),
-                  const SizedBox(height: AppSpacing.xxs),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: <Widget>[
-                      Text(
-                        '${_formatBytes(item.bytesTransferred)} / ${_formatBytes(item.totalBytes)}',
-                        style: context.textStyles.bodySmall,
-                      ),
-                      if (speedText.isNotEmpty)
-                        Text(speedText, style: context.textStyles.bodySmall),
-                    ],
-                  ),
-                ],
-                if (item.failure != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: AppSpacing.xxs),
-                    child: Text(
-                      item.failure!.userMessage,
-                      style: context.textStyles.bodySmall.copyWith(
-                        color: context.colors.danger,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        );
+        return _QueueItemCard(item: items[index], onCancel: onCancel);
       },
     );
   }

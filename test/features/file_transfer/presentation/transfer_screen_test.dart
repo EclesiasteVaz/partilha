@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:partilha/core/errors/failure.dart';
@@ -149,11 +151,9 @@ void main() {
     expect(find.text('Add more files'), findsOneWidget);
   });
 
-  testWidgets('leaves Send disabled and says transferring is unavailable', (
+  testWidgets('leaves Send disabled when destination is not paired', (
     tester,
   ) async {
-    // Transferring is not implemented. The action is present and disabled with
-    // an explanation rather than hidden, so the flow does not look finished.
     service.result = const Result<List<SelectedFile>, Failure>.success(files);
     controller.setDestination(destination);
 
@@ -164,7 +164,7 @@ void main() {
     final Finder send = find.widgetWithText(FilledButton, 'Send');
     expect(send, findsOneWidget);
     expect(tester.widget<FilledButton>(send).onPressed, isNull);
-    expect(find.text('Transferring is not available yet.'), findsOneWidget);
+    expect(find.text('Pair with this device to enable transfer.'), findsOneWidget);
   });
 
   testWidgets('shows the total for the selection', (tester) async {
@@ -201,4 +201,113 @@ void main() {
     expect(find.text('Total unknown'), findsOneWidget);
     expect(find.text('Size unknown'), findsOneWidget);
   });
+
+  testWidgets(
+    'shows Clear completed button when terminal items exist in queue and calls clearCompleted',
+    (tester) async {
+      final StreamController<List<TransferItem>> streamController =
+          StreamController<List<TransferItem>>.broadcast();
+      bool cleared = false;
+      final _FakeTransferQueue fakeQueue = _FakeTransferQueue(
+        stream: streamController.stream,
+        initialItems: <TransferItem>[
+          TransferItem(
+            request: TransferRequest(
+              id: '1',
+              destination: destination,
+              file: files.first,
+            ),
+            status: TransferStatus.completed,
+          ),
+        ],
+        onClearCompleted: () => cleared = true,
+      );
+
+      controller = TransferController(
+        selectFiles: SelectFilesUseCase(service),
+        clearCompletedTransfersUseCase: ClearCompletedTransfersUseCase(fakeQueue),
+        transferQueue: fakeQueue,
+      );
+
+      await pump(tester);
+
+      expect(find.text('Clear completed'), findsOneWidget);
+      await tester.tap(find.text('Clear completed'));
+      await tester.pumpAndSettle();
+
+      expect(cleared, isTrue);
+      await streamController.close();
+    },
+  );
+
+  testWidgets(
+    'shows Add more files button and queue items simultaneously',
+    (tester) async {
+      final StreamController<List<TransferItem>> streamController =
+          StreamController<List<TransferItem>>.broadcast();
+      final _FakeTransferQueue fakeQueue = _FakeTransferQueue(
+        stream: streamController.stream,
+        initialItems: <TransferItem>[
+          TransferItem(
+            request: TransferRequest(
+              id: '1',
+              destination: destination,
+              file: files.first,
+            ),
+            status: TransferStatus.transferring,
+          ),
+        ],
+      );
+
+      controller = TransferController(
+        selectFiles: SelectFilesUseCase(service),
+        transferQueue: fakeQueue,
+      );
+
+      await pump(tester);
+
+      expect(find.text('report.pdf'), findsOneWidget);
+      expect(find.text('Add more files'), findsOneWidget);
+
+      await streamController.close();
+    },
+  );
+}
+
+class _FakeTransferQueue implements TransferQueue {
+  _FakeTransferQueue({
+    this.initialItems = const <TransferItem>[],
+    Stream<List<TransferItem>>? stream,
+    this.onClearCompleted,
+  }) : _stream = stream ?? const Stream<List<TransferItem>>.empty();
+
+  final List<TransferItem> initialItems;
+  final Stream<List<TransferItem>> _stream;
+  final void Function()? onClearCompleted;
+
+  @override
+  void enqueue({
+    required TransferDestination destination,
+    required List<SelectedFile> files,
+  }) {}
+
+  @override
+  void clearCompleted() {
+    onClearCompleted?.call();
+  }
+
+  @override
+  void cancel(String transferId) {}
+
+  @override
+  void reset() {}
+
+  @override
+  Future<void> dispose() async {}
+
+  @override
+  List<TransferItem> get items => initialItems;
+
+  @override
+  Stream<List<TransferItem>> get updates => _stream;
 }

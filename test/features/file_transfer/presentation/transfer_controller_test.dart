@@ -198,4 +198,98 @@ void main() {
       expect(controller.state.files, isEmpty);
     });
   });
+
+  group('continuous selection and sending', () {
+    test('picking additional files appends to existing selection without duplicates', () async {
+      service.result = Result<List<SelectedFile>, Failure>.success(
+        <SelectedFile>[twoFiles.first],
+      );
+      await controller.pickFiles();
+      expect(controller.state.files, <SelectedFile>[twoFiles.first]);
+
+      // Pick second file + duplicate of first
+      service.result = const Result<List<SelectedFile>, Failure>.success(
+        twoFiles,
+      );
+      await controller.pickFiles();
+
+      expect(controller.state.files, twoFiles);
+    });
+
+    test('sendTransfers enqueues files and clears selection for next batch', () async {
+      List<SelectedFile>? queuedFiles;
+      TransferDestination? queuedDest;
+
+      final controllerWithQueue = TransferController(
+        selectFiles: SelectFilesUseCase(service),
+        queueTransfers: QueueTransfersUseCase(
+          _FakeTransferQueue(
+            onEnqueue: (dest, files) {
+              queuedDest = dest;
+              queuedFiles = files;
+            },
+          ),
+        ),
+      );
+
+      service.result = const Result<List<SelectedFile>, Failure>.success(twoFiles);
+      await controllerWithQueue.pickFiles();
+      controllerWithQueue.setDestination(destination);
+
+      expect(controllerWithQueue.state.files, twoFiles);
+
+      await controllerWithQueue.sendTransfers();
+
+      expect(queuedDest, destination);
+      expect(queuedFiles, twoFiles);
+      expect(controllerWithQueue.state.files, isEmpty);
+      expect(controllerWithQueue.state.status, TransferSetupStatus.initial);
+    });
+
+    test('clearCompleted delegates to ClearCompletedTransfersUseCase', () {
+      bool called = false;
+      final controllerWithClear = TransferController(
+        selectFiles: SelectFilesUseCase(service),
+        clearCompletedTransfersUseCase: ClearCompletedTransfersUseCase(
+          _FakeTransferQueue(onClearCompleted: () => called = true),
+        ),
+      );
+
+      controllerWithClear.clearCompleted();
+
+      expect(called, isTrue);
+    });
+  });
+}
+
+class _FakeTransferQueue implements TransferQueue {
+  _FakeTransferQueue({this.onEnqueue, this.onClearCompleted});
+
+  final void Function(TransferDestination destination, List<SelectedFile> files)? onEnqueue;
+  final void Function()? onClearCompleted;
+
+  @override
+  void enqueue({required TransferDestination destination, required List<SelectedFile> files}) {
+    onEnqueue?.call(destination, files);
+  }
+
+  @override
+  void clearCompleted() {
+    onClearCompleted?.call();
+  }
+
+  @override
+  void cancel(String transferId) {}
+
+  @override
+  void reset() {}
+
+  @override
+  Future<void> dispose() async {}
+
+  @override
+  List<TransferItem> get items => const <TransferItem>[];
+
+  @override
+  Stream<List<TransferItem>> get updates => const Stream<List<TransferItem>>.empty();
 }
