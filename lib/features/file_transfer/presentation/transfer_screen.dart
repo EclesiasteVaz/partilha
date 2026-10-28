@@ -48,8 +48,9 @@ class _Body extends StatelessWidget {
   final TransferState state;
 
   Future<void> _handleDisconnect(BuildContext context) async {
-    final hasActive =
-        controller.queueItems.any((item) => !item.status.isTerminal);
+    final hasActive = controller.queueItems.any(
+      (item) => !item.status.isTerminal,
+    );
     if (hasActive) {
       final bool? confirm = await showDialog<bool>(
         context: context,
@@ -245,10 +246,7 @@ class _Body extends StatelessWidget {
 }
 
 class _DestinationCard extends StatelessWidget {
-  const _DestinationCard({
-    required this.destination,
-    this.onDisconnect,
-  });
+  const _DestinationCard({required this.destination, this.onDisconnect});
 
   final TransferDestination destination;
   final VoidCallback? onDisconnect;

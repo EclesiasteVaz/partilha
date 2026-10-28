@@ -156,7 +156,9 @@ class WebSocketTransferRepository implements TransferRepository {
         }
 
         final nameRes = await getDeviceNameUseCase?.call();
-        if (nameRes != null && nameRes.isSuccess && nameRes.valueOrNull != null) {
+        if (nameRes != null &&
+            nameRes.isSuccess &&
+            nameRes.valueOrNull != null) {
           deviceName = nameRes.valueOrNull!.value;
         }
 
