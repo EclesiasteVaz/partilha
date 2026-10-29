@@ -47,6 +47,37 @@ class _Body extends StatelessWidget {
   final TransferController controller;
   final TransferState state;
 
+  Future<void> _handleDisconnect(BuildContext context) async {
+    final hasActive = controller.queueItems.any(
+      (item) => !item.status.isTerminal,
+    );
+    if (hasActive) {
+      final bool? confirm = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext dialogContext) {
+          return AlertDialog(
+            title: const Text('Disconnect from device?'),
+            content: const Text(
+              'A file transfer is in progress. Disconnecting will cancel ongoing transfers.',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Keep connected'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Disconnect'),
+              ),
+            ],
+          );
+        },
+      );
+      if (confirm != true) return;
+    }
+    await controller.disconnect();
+  }
+
   @override
   Widget build(BuildContext context) {
     final TransferDestination? destination = state.destination;
@@ -61,8 +92,11 @@ class _Body extends StatelessWidget {
           Text('Destination', style: context.textStyles.titleMedium),
           const SizedBox(height: AppSpacing.xs),
           if (destination != null)
-            _DestinationCard(destination: destination)
-          else
+            _DestinationCard(
+              destination: destination,
+              onDisconnect: () => _handleDisconnect(context),
+            )
+          else ...<Widget>[
             Text(
               // Reaching this screen without a destination is not possible
               // through navigation, so say what to do instead of rendering an
@@ -70,6 +104,13 @@ class _Body extends StatelessWidget {
               'No device selected. Go back and choose one.',
               style: context.textStyles.bodySmall,
             ),
+            const SizedBox(height: AppSpacing.xs),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const Icon(Icons.arrow_back, size: 16),
+              label: const Text('Choose another device'),
+            ),
+          ],
           const SizedBox(height: AppSpacing.lg),
           Row(
             children: <Widget>[
@@ -205,9 +246,10 @@ class _Body extends StatelessWidget {
 }
 
 class _DestinationCard extends StatelessWidget {
-  const _DestinationCard({required this.destination});
+  const _DestinationCard({required this.destination, this.onDisconnect});
 
   final TransferDestination destination;
+  final VoidCallback? onDisconnect;
 
   @override
   Widget build(BuildContext context) {
@@ -221,8 +263,11 @@ class _DestinationCard extends StatelessWidget {
           '${destination.address}:${destination.port}',
           style: context.textStyles.bodySmall,
         ),
-        trailing: destination.token != null
-            ? Container(
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (destination.token != null)
+              Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
                   vertical: 4,
@@ -246,8 +291,17 @@ class _DestinationCard extends StatelessWidget {
                     ),
                   ],
                 ),
-              )
-            : null,
+              ),
+            if (onDisconnect != null) ...<Widget>[
+              const SizedBox(width: AppSpacing.xxs),
+              IconButton(
+                onPressed: onDisconnect,
+                icon: const Icon(Icons.close, size: 20),
+                tooltip: 'Disconnect',
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

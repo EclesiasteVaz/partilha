@@ -10,6 +10,8 @@ import 'package:partilha/core/network/transport_frame.dart';
 import 'package:partilha/core/network/websocket_transport.dart';
 import 'package:partilha/core/protocol/protocol.dart';
 import 'package:partilha/features/file_transfer/domain/domain.dart';
+import 'package:partilha/features/pairing/application/get_device_identity_use_case.dart';
+import 'package:partilha/features/settings/application/get_device_name_use_case.dart';
 
 /// Sender implementation of [TransferRepository] over [WebSocketTransport].
 ///
@@ -23,6 +25,8 @@ class WebSocketTransferRepository implements TransferRepository {
   WebSocketTransferRepository({
     this.transport,
     this.transportFactory,
+    this.getDeviceIdentityUseCase,
+    this.getDeviceNameUseCase,
     AppLogger? logger,
   }) : _logger =
            logger ??
@@ -33,7 +37,20 @@ class WebSocketTransferRepository implements TransferRepository {
 
   final WebSocketTransport? transport;
   final WebSocketTransport Function()? transportFactory;
+  final GetDeviceIdentityUseCase? getDeviceIdentityUseCase;
+  final GetDeviceNameUseCase? getDeviceNameUseCase;
   final AppLogger _logger;
+
+  WebSocketTransport? _activeTransport;
+
+  @override
+  Future<void> closeSession() async {
+    final active = _activeTransport ?? transport;
+    if (active != null && active.isConnected) {
+      await active.close();
+    }
+    _activeTransport = null;
+  }
 
   @override
   Stream<FileTransferProgress> send(TransferRequest request) {
@@ -100,7 +117,9 @@ class WebSocketTransferRepository implements TransferRepository {
       final factory = transportFactory;
       final transport =
           this.transport ??
+          _activeTransport ??
           (factory != null ? factory() : DartIoWebSocketTransport(_logger));
+      _activeTransport = transport;
 
       // 1. Connect if needed
       if (!transport.isConnected) {
@@ -128,10 +147,25 @@ class WebSocketTransferRepository implements TransferRepository {
       // 2. Handshake if token present
       final token = request.destination.token;
       if (token != null && token.isNotEmpty) {
+        String deviceId = 'local_device';
+        String deviceName = 'Partilha Device';
+
+        final idRes = await getDeviceIdentityUseCase?.call();
+        if (idRes != null && idRes.isSuccess && idRes.valueOrNull != null) {
+          deviceId = idRes.valueOrNull!.deviceId;
+        }
+
+        final nameRes = await getDeviceNameUseCase?.call();
+        if (nameRes != null &&
+            nameRes.isSuccess &&
+            nameRes.valueOrNull != null) {
+          deviceName = nameRes.valueOrNull!.value;
+        }
+
         final pairId = 'pair_${DateTime.now().millisecondsSinceEpoch}';
         final pairPayload = PairRequestPayload(
-          deviceId: 'local_device',
-          deviceName: 'Partilha Device',
+          deviceId: deviceId,
+          deviceName: deviceName,
           token: token,
         );
         final pairMsg = ControlMessage(

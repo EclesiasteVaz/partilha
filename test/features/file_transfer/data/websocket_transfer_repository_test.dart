@@ -10,6 +10,10 @@ import 'package:partilha/core/protocol/protocol.dart';
 import 'package:partilha/core/result/result.dart';
 import 'package:partilha/features/file_transfer/data/websocket_transfer_repository.dart';
 import 'package:partilha/features/file_transfer/domain/domain.dart';
+import 'package:partilha/features/pairing/application/get_device_identity_use_case.dart';
+import 'package:partilha/features/pairing/domain/domain.dart';
+import 'package:partilha/features/settings/application/get_device_name_use_case.dart';
+import 'package:partilha/features/settings/domain/domain.dart';
 
 final class FakeWebSocketTransport implements WebSocketTransport {
   final StreamController<TransportEvent> _eventsController =
@@ -296,4 +300,109 @@ void main() {
       expect(events.last.bytesTransferred, testFile.lengthSync());
     },
   );
+
+  test('closeSession disconnects active transport and clears it', () async {
+    expect(fakeTransport.isConnected, isTrue);
+    await repository.closeSession();
+    expect(fakeTransport.isConnected, isFalse);
+  });
+
+  test('send uses device identity and device name in handshake', () async {
+    final fakePairingRepo = _FakePairingRepository();
+    final fakeSettingsRepo = _FakeSettingsRepository();
+    final customRepo = WebSocketTransferRepository(
+      transport: fakeTransport,
+      getDeviceIdentityUseCase: GetDeviceIdentityUseCase(fakePairingRepo),
+      getDeviceNameUseCase: GetDeviceNameUseCase(fakeSettingsRepo),
+    );
+
+    const destination = TransferDestination(
+      deviceId: 'receiver-1',
+      deviceName: 'Receiver Device',
+      address: '127.0.0.1',
+      port: 8080,
+      token: 'valid-token',
+    );
+
+    final request = TransferRequest(
+      id: 'req-handshake',
+      destination: destination,
+      file: SelectedFile(
+        name: 'sample.txt',
+        path: testFile.path,
+        sizeInBytes: testFile.lengthSync(),
+      ),
+    );
+
+    Timer.periodic(const Duration(milliseconds: 10), (timer) {
+      for (final msgJson in fakeTransport.sentControlMessages) {
+        final decoded = ControlMessageCodec.decode(msgJson);
+        if (decoded is ControlDecoded) {
+          final msg = decoded.message;
+          if (msg.type == ProtocolMessageTypes.pairRequest) {
+            fakeTransport.emitControl(
+              ControlMessage(
+                type: ProtocolMessageTypes.pairResponse,
+                id: 'resp-pair',
+                payload: const PairResponsePayload(accepted: true).toJson(),
+              ),
+            );
+          } else if (msg.type == ProtocolMessageTypes.transferOffer) {
+            final wireId = msg.payload['wireTransferId'] as String;
+            fakeTransport.emitControl(
+              ControlMessage(
+                type: ProtocolMessageTypes.transferAccept,
+                id: 'resp-accept',
+                payload: TransferAcceptPayload(wireTransferId: wireId).toJson(),
+              ),
+            );
+            Future.delayed(const Duration(milliseconds: 20), () {
+              fakeTransport.emitControl(
+                ControlMessage(
+                  type: ProtocolMessageTypes.transferComplete,
+                  id: 'resp-complete',
+                  payload: TransferCompletePayload(
+                    wireTransferId: wireId,
+                  ).toJson(),
+                ),
+              );
+            });
+            timer.cancel();
+            break;
+          }
+        }
+      }
+    });
+
+    await customRepo.send(request).drain<void>();
+
+    final pairReqMsg = fakeTransport.sentControlMessages
+        .map(ControlMessageCodec.decode)
+        .whereType<ControlDecoded>()
+        .firstWhere((d) => d.message.type == ProtocolMessageTypes.pairRequest);
+    expect(pairReqMsg.message.payload['deviceId'], 'rec-dev');
+    expect(pairReqMsg.message.payload['deviceName'], 'Receiver Mac');
+    expect(pairReqMsg.message.payload['token'], 'valid-token');
+  });
+}
+
+class _FakePairingRepository implements PairingRepository {
+  @override
+  Future<Result<DeviceIdentity, Failure>> getOrCreateIdentity() async {
+    return const Result.success(
+      DeviceIdentity(deviceId: 'rec-dev', token: 'secret-tok'),
+    );
+  }
+}
+
+class _FakeSettingsRepository implements SettingsRepository {
+  @override
+  Future<Result<DeviceName, Failure>> readDeviceName() async {
+    return Result.success(DeviceName.create('Receiver Mac').valueOrNull!);
+  }
+
+  @override
+  Future<Result<void, Failure>> saveDeviceName(DeviceName name) async {
+    return const Result.success(null);
+  }
 }

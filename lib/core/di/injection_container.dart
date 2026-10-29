@@ -217,9 +217,22 @@ void configureDependencies({required AppLogger logger}) {
     // one. The queue captures a single instance when it is first built, which
     // is correct only while the repository keeps no state between `send` calls
     // — the constraint the real implementation must keep (§81).
-    ..registerFactory<TransferRepository>(WebSocketTransferRepository.new)
+    ..registerLazySingleton<TransferRepository>(
+      () => WebSocketTransferRepository(
+        getDeviceIdentityUseCase: injectionContainer
+            .resolve<GetDeviceIdentityUseCase>(),
+        getDeviceNameUseCase: injectionContainer
+            .resolve<GetDeviceNameUseCase>(),
+        logger: injectionContainer.resolve<AppLogger>(),
+      ),
+    )
     ..registerFactory<SendFileUseCase>(
       () => SendFileUseCase(injectionContainer.resolve<TransferRepository>()),
+    )
+    ..registerFactory<CloseTransferSessionUseCase>(
+      () => CloseTransferSessionUseCase(
+        injectionContainer.resolve<TransferRepository>(),
+      ),
     )
     // A lazy singleton because it owns the queue: items outlive any one screen,
     // and a factory would hand every resolution a fresh, empty queue
@@ -254,6 +267,8 @@ void configureDependencies({required AppLogger logger}) {
             .resolve<CancelTransferUseCase>(),
         clearCompletedTransfersUseCase: injectionContainer
             .resolve<ClearCompletedTransfersUseCase>(),
+        closeTransferSessionUseCase: injectionContainer
+            .resolve<CloseTransferSessionUseCase>(),
         transferQueue: injectionContainer.resolve<TransferQueue>(),
       ),
     )

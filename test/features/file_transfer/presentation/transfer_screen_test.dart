@@ -276,6 +276,77 @@ void main() {
 
     await streamController.close();
   });
+
+  testWidgets(
+    'renders disconnect button and tapping it when idle disconnects',
+    (tester) async {
+      controller.setDestination(destination);
+      await pump(tester);
+
+      expect(find.byTooltip('Disconnect'), findsOneWidget);
+      await tester.tap(find.byTooltip('Disconnect'));
+      await tester.pumpAndSettle();
+
+      expect(controller.state.destination, isNull);
+      expect(find.textContaining('No device selected'), findsOneWidget);
+      expect(find.text('Choose another device'), findsOneWidget);
+    },
+  );
+
+  testWidgets('tapping disconnect with active transfers prompts confirmation', (
+    tester,
+  ) async {
+    final StreamController<List<TransferItem>> streamController =
+        StreamController<List<TransferItem>>.broadcast();
+    final _FakeTransferQueue fakeQueue = _FakeTransferQueue(
+      stream: streamController.stream,
+      initialItems: <TransferItem>[
+        TransferItem(
+          request: TransferRequest(
+            id: '1',
+            destination: destination,
+            file: files.first,
+          ),
+          status: TransferStatus.transferring,
+        ),
+      ],
+    );
+
+    controller = TransferController(
+      selectFiles: SelectFilesUseCase(service),
+      transferQueue: fakeQueue,
+    );
+    controller.setDestination(destination);
+
+    await pump(tester);
+
+    await tester.tap(find.byTooltip('Disconnect'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Disconnect from device?'), findsOneWidget);
+    expect(
+      find.text(
+        'A file transfer is in progress. Disconnecting will cancel ongoing transfers.',
+      ),
+      findsOneWidget,
+    );
+
+    // Cancel dismissal
+    await tester.tap(find.text('Keep connected'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Disconnect from device?'), findsNothing);
+    expect(controller.state.destination, destination);
+
+    // Confirm disconnect
+    await tester.tap(find.byTooltip('Disconnect'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Disconnect'));
+    await tester.pumpAndSettle();
+
+    expect(controller.state.destination, isNull);
+    await streamController.close();
+  });
 }
 
 class _FakeTransferQueue implements TransferQueue {
